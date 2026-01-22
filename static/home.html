@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ko">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>홈 - tuum.day</title>
+        <link rel="stylesheet" href="./style.css" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    </head>
+    <body class="home-page">
+        <div id="header-placeholder"></div>
+
+        <main class="home-content">
+            <section class="welcome-section">
+                <h2><i class="fas fa-hard-hat"></i> 공사중</h2>
+                <p>더 나은 서비스를 위해 준비중입니다.</p>
+                <div class="construction-notice">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>현재 서비스의 구체적인 내용을 기획하고 있습니다.</p>
+                    <p>조금만 기다려주시면 곧 멋진 모습으로 찾아뵙겠습니다!</p>
+                </div>
+            </section>
+            <section class="action-section">
+                <a href="/chat" class="start-chat-button"> <i class="fas fa-flask"></i> 베타 버전 체험하기 </a>
+            </section>
+        </main>
+        <script>
+            // 임시 리다이렉트
+            window.location.href = '/hotdeal';
+        </script>
+        <script src="./js/auth.js?v=1.0.0"></script>
+        <script>
+            (async () => {
+                const isLogin = await checkLoginStatus();
+                if (!isLogin) {
+                    window.location.href = '/login';
+                }
+            })();
+
+            document.addEventListener('DOMContentLoaded', async () => {
+                const userInfo = await getUserInfo();
+                if (userInfo) {
+                    document.getElementById('user-nickname').textContent = userInfo.nickname;
+                }
+            });
+            fetch('/header.html')
+                .then((response) => response.text())
+                .then((data) => {
+                    document.getElementById('header-placeholder').innerHTML = data;
+                    // 헤더가 로드된 후 로그아웃 버튼 이벤트 리스너 다시 설정
+                    const logoutButton = document.getElementById('logout-button');
+                    if (logoutButton) {
+                        logoutButton.addEventListener('click', () => {
+                            import('./js/auth_utils.js').then((module) => module.logout());
+                        });
+                    }
+                })
+                .catch((error) => console.error('Error loading header:', error));
+        </script>
+    </body>
+</html>

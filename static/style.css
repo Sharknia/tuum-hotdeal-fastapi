@@ -1,0 +1,796 @@
+:root {
+    /* Colors */
+    --primary-color: #007bff;
+    --primary-hover-color: #0056b3;
+    --body-bg: #f4f7f6;
+    --container-bg: #ffffff;
+    --sidebar-bg: #f8f9fa;
+    --header-bg: #f8f9fa;
+    --input-border-color: #ced4da;
+    --border-color: #dee2e6;
+    --text-color: #333;
+    --text-muted-color: #666;
+    --text-dark-color: #495057;
+    --user-message-bg: #e2ffc7;
+    --assistant-message-bg: #e9e9eb;
+    --scrollbar-track-color: #f1f1f1;
+    --scrollbar-thumb-color: #c1c1c1;
+    --scrollbar-thumb-hover-color: #a1a1a1;
+    --shadow-color: rgba(0, 0, 0, 0.1);
+
+    /* Icons */
+    --main-icon-url: url('https://ktlnpawucfuxjbufkplf.supabase.co/storage/v1/object/public/pb//tuum.png');
+
+    /* Fonts */
+    --font-family-base: 'Noto Sans KR', sans-serif;
+    --font-size-base: 14px;
+    --font-size-sm: 12px;
+    --font-size-lg: 16px;
+    --font-size-h1: 24px;
+    --font-size-h2: 18px;
+
+    /* Spacing */
+    --spacing-sm: 8px;
+    --spacing-md: 10px;
+    --spacing-lg: 15px;
+    --spacing-xl: 20px;
+
+    /* Borders */
+    --border-radius-sm: 5px;
+    --border-radius-md: 8px;
+    --border-radius-lg: 18px;
+    --border-radius-xl: 20px;
+
+    /* Transitions */
+    --transition-fast: 0.1s;
+    --transition-base: 0.2s;
+    --transition-slow: 0.3s;
+}
+
+body {
+    font-family: var(--font-family-base);
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    background-color: var(--body-bg);
+    /* 기본 body 스타일 - 채팅 페이지 기준 (flex 제거됨) */
+}
+
+/* 로그인/회원가입 페이지 body 스타일 */
+body.login-page,
+body.signup-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#app-layout {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+    transition: margin-left var(--transition-slow) ease;
+}
+
+#sidebar {
+    width: 250px;
+    min-width: 250px;
+    background-color: var(--sidebar-bg);
+    padding: var(--spacing-lg);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    box-sizing: border-box;
+    transition: width var(--transition-slow) ease, min-width var(--transition-slow) ease,
+        padding var(--transition-slow) ease, opacity var(--transition-slow) ease;
+    overflow: hidden;
+}
+
+#new-chat-button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-radius: var(--border-radius-md);
+    cursor: pointer;
+    text-align: center;
+    font-size: var(--font-size-base);
+    font-weight: 500;
+    margin-bottom: var(--spacing-lg);
+    transition: background-color var(--transition-base);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#new-chat-button i {
+    margin-right: var(--spacing-sm);
+}
+
+#new-chat-button:hover {
+    background-color: var(--primary-hover-color);
+}
+
+#sidebar h2 {
+    margin-top: 0;
+    margin-bottom: var(--spacing-lg);
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+    color: var(--text-dark-color);
+    border-bottom: 1px solid #e9ecef; /* 연한 회색 테두리, 변수화 애매 */
+    padding-bottom: var(--spacing-md);
+}
+
+#sidebar ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    overflow-y: auto;
+    flex-grow: 1;
+}
+
+#sidebar li {
+    margin-bottom: var(--spacing-sm);
+}
+
+#sidebar li a {
+    text-decoration: none;
+    color: var(--text-color);
+    display: block;
+    padding: var(--spacing-sm) 12px;
+    border-radius: var(--border-radius-sm);
+    transition: background-color var(--transition-base);
+    font-size: var(--font-size-base);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#sidebar li a:hover {
+    background-color: #dcdcdc; /* 변수화 애매 */
+}
+
+#sidebar li.active a {
+    background-color: var(--primary-color);
+    color: white;
+    font-weight: 500;
+}
+
+/* 사이드바 숨김 상태 */
+#app-layout.sidebar-collapsed #sidebar {
+    width: 0;
+    min-width: 0;
+    padding: var(--spacing-lg) 0;
+    opacity: 0;
+    border-right: none;
+}
+
+#chat-area {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background-color: var(--container-bg);
+    position: relative;
+}
+
+#chat-header {
+    display: flex;
+    align-items: center;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-bottom: 1px solid #e9ecef;
+    background-color: var(--header-bg);
+}
+
+#chatbox {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: var(--spacing-xl);
+    background-color: var(--container-bg);
+    display: flex;
+    flex-direction: column;
+}
+
+.message {
+    margin-bottom: var(--spacing-lg);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-radius: var(--border-radius-lg);
+    max-width: 75%;
+    line-height: 1.5;
+    box-shadow: 0 1px 2px var(--shadow-color);
+}
+
+.user-message {
+    background-color: var(--user-message-bg);
+    align-self: flex-end;
+    margin-left: auto;
+    border-bottom-right-radius: var(--border-radius-sm);
+}
+
+.assistant-message {
+    background-color: var(--assistant-message-bg);
+    align-self: flex-start;
+    margin-right: auto;
+    border-bottom-left-radius: var(--border-radius-sm);
+}
+
+#input-area {
+    display: flex;
+    padding: var(--spacing-lg);
+    background-color: var(--container-bg);
+    border-top: 1px solid #e0e0e0;
+}
+
+#message {
+    flex-grow: 1;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border: 1px solid var(--input-border-color);
+    border-radius: var(--border-radius-xl);
+    margin-right: var(--spacing-md);
+    font-size: var(--font-size-base);
+    outline: none;
+    transition: border-color var(--transition-base);
+}
+
+#message:focus {
+    border-color: var(--primary-color);
+}
+
+button {
+    padding: var(--spacing-md) var(--spacing-xl);
+    border: none;
+    background-color: var(--primary-color);
+    color: white;
+    border-radius: var(--border-radius-xl);
+    cursor: pointer;
+    font-size: var(--font-size-base);
+    font-weight: 500;
+    transition: background-color var(--transition-base);
+}
+
+button:hover {
+    background-color: var(--primary-hover-color);
+}
+
+/* 스크롤바 스타일 */
+#chatbox::-webkit-scrollbar {
+    width: 6px;
+}
+
+#chatbox::-webkit-scrollbar-track {
+    background: var(--scrollbar-track-color);
+}
+
+#chatbox::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb-color);
+    border-radius: 3px;
+}
+
+#chatbox::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover-color);
+}
+
+#sidebar-toggle {
+    z-index: 10;
+    background: var(--sidebar-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-dark-color);
+    padding: 5px var(--spacing-md);
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    transition: background-color var(--transition-base);
+    margin-right: var(--spacing-lg);
+}
+
+#sidebar-toggle:hover {
+    background-color: #e9ecef;
+}
+
+#model-selector-area {
+    margin-left: auto;
+    margin-right: auto;
+}
+
+#model-selector {
+    padding: 6px var(--spacing-md);
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--input-border-color);
+    font-size: var(--font-size-base);
+    min-width: 200px;
+    cursor: pointer;
+    background-color: var(--container-bg);
+    color: var(--text-dark-color);
+}
+
+#user-profile-area {
+    position: relative;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    margin-left: auto;
+}
+
+#profile-icon {
+    font-size: 28px;
+    color: #adb5bd;
+    margin-right: var(--spacing-sm);
+    line-height: 1;
+}
+
+#user-nickname {
+    font-size: var(--font-size-base);
+    font-weight: 500;
+    color: var(--text-dark-color);
+    margin-right: var(--spacing-sm);
+}
+
+.dropdown-content {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background-color: var(--container-bg);
+    min-width: 160px;
+    box-shadow: 0px 8px 16px 0px var(--shadow-color);
+    z-index: 1;
+    border-radius: var(--border-radius-sm);
+    overflow: hidden;
+}
+
+.dropdown-content a {
+    color: var(--text-color);
+    padding: 12px var(--spacing-lg);
+    text-decoration: none;
+    display: block;
+    font-size: var(--font-size-base);
+    transition: background-color var(--transition-fast);
+}
+
+.dropdown-content a i {
+    margin-right: var(--spacing-md);
+    width: 15px;
+    text-align: center;
+}
+
+.dropdown-content a:hover {
+    background-color: var(--scrollbar-track-color);
+}
+
+.dropdown-content.show {
+    display: block;
+}
+
+/* Login/Signup Page Specific Styles */
+
+.auth-container {
+    /* Renamed from login/signup-container */
+    width: 100%;
+    max-width: 400px;
+    padding: var(--spacing-xl);
+}
+
+.auth-box {
+    /* Renamed from login/signup-box */
+    background-color: var(--container-bg);
+    padding: 40px 30px;
+    border-radius: var(--border-radius-md);
+    box-shadow: 0 4px 15px var(--shadow-color);
+    text-align: center;
+}
+
+.auth-box h1 {
+    font-size: var(--font-size-h1);
+    font-weight: 700;
+    color: var(--text-color);
+    margin-top: 0;
+    margin-bottom: var(--spacing-md);
+}
+
+.auth-box p {
+    color: var(--text-muted-color);
+    margin-bottom: 30px;
+    font-size: var(--font-size-base);
+}
+
+.auth-box .input-group {
+    margin-bottom: var(--spacing-xl);
+    text-align: left;
+}
+
+.auth-box .input-group label {
+    display: block;
+    margin-bottom: var(--spacing-sm);
+    font-size: var(--font-size-base);
+    font-weight: 500;
+    color: var(--text-dark-color);
+}
+
+.auth-box .input-group input {
+    width: 100%;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border: 1px solid var(--input-border-color);
+    border-radius: var(--border-radius-sm);
+    font-size: var(--font-size-base);
+    box-sizing: border-box;
+    outline: none;
+    transition: border-color var(--transition-base);
+}
+
+.auth-box .input-group input:focus {
+    border-color: var(--primary-color);
+}
+
+.input-group-inline {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: var(--spacing-xl);
+    text-align: left;
+}
+
+.input-group-inline input[type='checkbox'] {
+    /* 최신 브라우저에서 체크박스 색상을 테마에 맞게 변경합니다. */
+    accent-color: var(--primary-color);
+    width: 16px;
+    height: 16px;
+    margin: 0 var(--spacing-sm) 0 0;
+    cursor: pointer;
+}
+
+.input-group-inline label {
+    font-size: var(--font-size-base);
+    font-weight: 500;
+    color: var(--text-dark-color);
+    cursor: pointer;
+}
+.auth-button {
+    /* Renamed from login/signup-button */
+    width: 100%;
+    padding: 12px var(--spacing-xl);
+    border: none;
+    background-color: var(--primary-color);
+    color: white;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    font-size: var(--font-size-lg);
+    font-weight: 500;
+    transition: background-color var(--transition-base);
+    margin-bottom: var(--spacing-xl);
+}
+
+.auth-button:hover {
+    background-color: var(--primary-hover-color);
+}
+
+.auth-link {
+    /* Renamed from signup/login-link */
+    font-size: var(--font-size-base);
+    color: var(--text-muted-color);
+}
+
+.auth-link a {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.auth-link a:hover {
+    text-decoration: underline;
+}
+
+/* 홈페이지 스타일 */
+.home-page {
+    min-height: 100vh;
+    background-color: #f5f5f5;
+}
+
+.main-nav {
+    background-color: #ffffff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 1rem 2rem;
+}
+
+.nav-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nav-left {
+    display: flex;
+    align-items: center;
+}
+
+.nav-left h1 {
+    margin: 0;
+    font-size: var(--font-size-h1);
+    font-weight: 700;
+    color: var(--text-dark-color);
+}
+
+.nav-logo {
+    height: 50px; /* 로고 높이 설정 */
+    margin-right: var(--spacing-sm); /* 로고와 텍스트 사이 간격 */
+    vertical-align: middle; /* 텍스트와 수직 정렬 */
+}
+
+.nav-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.nav-button {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    background-color: #007bff;
+    color: white;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.nav-button:hover {
+    background-color: #0056b3;
+}
+
+.home-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.welcome-section {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.welcome-section h2 {
+    font-size: 2rem;
+    color: #333;
+    margin-bottom: 1rem;
+}
+
+.features-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 2rem;
+    margin-bottom: 3rem;
+}
+
+.feature-card {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+.feature-card i {
+    font-size: 2.5rem;
+    color: #007bff;
+    margin-bottom: 1rem;
+}
+
+.feature-card h3 {
+    color: #333;
+    margin-bottom: 1rem;
+}
+
+.action-section {
+    text-align: center;
+}
+
+.start-chat-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem 2rem;
+    font-size: 1.2rem;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 0.3s;
+}
+
+.start-chat-button:hover {
+    background-color: #218838;
+}
+
+#user-nickname {
+    font-weight: 500;
+    color: #333;
+}
+
+/* 공사중 페이지 스타일 */
+.construction-notice {
+    background-color: #fff3cd;
+    border: 1px solid #ffeeba;
+    border-radius: 8px;
+    padding: 2rem;
+    margin: 2rem auto;
+    max-width: 600px;
+    text-align: center;
+}
+
+.construction-notice i {
+    font-size: 2.5rem;
+    color: #856404;
+    margin-bottom: 1rem;
+}
+
+.construction-notice p {
+    color: #856404;
+    margin: 0.5rem 0;
+}
+
+.welcome-section h2 i {
+    margin-right: 0.5rem;
+}
+
+.welcome-section {
+    text-align: center;
+    padding: 3rem 1rem;
+}
+
+.welcome-section h2 {
+    color: #333;
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+}
+
+.action-section {
+    text-align: center;
+    margin-top: 2rem;
+}
+
+.start-chat-button:hover {
+    background-color: #0056b3;
+}
+
+/* 핫딜 페이지 스타일 */
+.hotdeal-page {
+    /* 기존 home-page 스타일과 유사하게 설정하거나 필요에 맞게 조정 */
+    min-height: 100vh;
+    background-color: var(--body-bg);
+}
+
+.hotdeal-content {
+    max-width: 800px; /* 홈보다 약간 좁게 */
+    margin: 0 auto;
+    padding: var(--spacing-xl);
+}
+
+.hotdeal-keyword-list-section,
+.add-hotdeal-section {
+    background-color: var(--container-bg);
+    padding: var(--spacing-xl);
+    border-radius: var(--border-radius-md);
+    box-shadow: 0 2px 4px var(--shadow-color);
+    margin-bottom: var(--spacing-xl);
+}
+
+.hotdeal-keyword-list-section h2,
+.add-hotdeal-section h2 {
+    font-size: var(--font-size-h2);
+    font-weight: 700;
+    color: var(--text-dark-color);
+    margin-top: 0;
+    margin-bottom: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: var(--spacing-md);
+}
+
+.hotdeal-keyword-list-section h2 i,
+.add-hotdeal-section h2 i {
+    margin-right: var(--spacing-sm);
+}
+
+#hotdeal-keyword-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+#hotdeal-keyword-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md) 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+#hotdeal-keyword-list li:last-child {
+    border-bottom: none;
+}
+
+#hotdeal-keyword-list li span {
+    flex-grow: 1;
+    margin-right: var(--spacing-md);
+    color: var(--text-color);
+    font-size: var(--font-size-base);
+}
+
+.keyword-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm); /* 버튼 사이 간격 */
+}
+
+/* 버튼 공통 스타일 */
+.keyword-actions a,
+.keyword-actions button {
+    font-size: var(--font-size-sm);
+    padding: 5px 10px; /* 패딩 조정 */
+    border-radius: var(--border-radius-sm); /* 둥근 모서리 */
+    cursor: pointer;
+    transition: background-color var(--transition-base), color var(--transition-base), box-shadow var(--transition-base);
+    text-decoration: none; /* 링크 밑줄 제거 */
+    border: 1px solid transparent; /* 테두리 공간 확보 */
+    line-height: 1.2; /* 줄 높이 조정 */
+}
+
+/* 목록 보기 버튼 스타일 */
+.search-link-button {
+    background-color: #e9ecef; /* 연한 회색 배경 */
+    color: var(--text-dark-color);
+    border-color: #ced4da; /* 연한 회색 테두리 */
+}
+
+.search-link-button:hover {
+    background-color: #dee2e6;
+    color: var(--text-dark-color);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* 삭제 버튼 스타일 */
+.delete-button {
+    background-color: #f8d7da; /* 연한 빨간색 배경 */
+    color: #721c24; /* 진한 빨간색 텍스트 */
+    border-color: #f5c6cb; /* 연한 빨간색 테두리 */
+}
+
+.delete-button:hover {
+    background-color: #f1b0b7;
+    color: #721c24;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+#add-hotdeal-keyword-form {
+    display: flex;
+    gap: var(--spacing-md);
+}
+
+#hotdeal-keyword-input {
+    flex-grow: 1;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border: 1px solid var(--input-border-color);
+    border-radius: var(--border-radius-sm);
+    font-size: var(--font-size-base);
+    outline: none;
+    transition: border-color var(--transition-base);
+}
+
+#hotdeal-keyword-input:focus {
+    border-color: var(--primary-color);
+}
+
+#add-hotdeal-keyword-form button {
+    /* 기본 버튼 스타일 사용 */
+    padding: var(--spacing-md) var(--spacing-xl);
+    border-radius: var(--border-radius-sm);
+}
+
+#add-hotdeal-keyword-form button i {
+    margin-right: var(--spacing-sm);
+}

@@ -1,0 +1,41 @@
+# Python 3.12 Slim 이미지를 베이스로 사용합니다.
+FROM python:3.12-slim
+
+# 시스템 업데이트 및 빌드에 필요한 패키지 설치 (curl, build-essential, netcat-openbsd 등)
+# netcat-openbsd는 entrypoint.sh에서 DB 연결 확인에 사용됩니다.
+RUN apt-get update && apt-get install -y curl build-essential netcat-openbsd && rm -rf /var/lib/apt/lists/*
+
+# Poetry 설치
+ENV POETRY_VERSION=2.1.1
+RUN curl -sSL https://install.python-poetry.org | python3 - --version $POETRY_VERSION
+ENV PATH="/root/.local/bin:$PATH"
+
+# 작업 디렉터리를 /app으로 설정합니다.
+WORKDIR /app
+
+# PYTHONPATH 환경 변수 설정
+# WORKDIR가 /app이므로, /app 디렉토리를 Python 모듈 검색 경로에 추가합니다.
+ENV PYTHONPATH=/app
+
+# pyproject.toml 및 poetry.lock 파일을 먼저 복사하여 의존성 설치 캐싱을 활용합니다.
+COPY pyproject.toml poetry.lock* /app/
+
+# Poetry 설정 및 의존성 설치
+# --no-root 옵션은 프로젝트 자체를 설치하지 않고 의존성만 설치합니다.
+# app/worker_main.py 실행에 문제가 없다면 그대로 사용합니다.
+# entrypoint.sh에서 alembic을 사용하므로, alembic이 dev dependency가 아니라면 --no-dev 옵션은 제거해야 합니다.
+# 여기서는 기존 Dockerfile과 동일하게 --no-root를 사용합니다.
+RUN poetry config virtualenvs.create false && poetry install --no-interaction --no-ansi --no-root
+
+# 나머지 소스 코드 복사
+COPY . /app
+
+# Entrypoint 스크립트 복사 및 실행 권한 부여
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# 기본 작업 디렉토리 설정
+WORKDIR /app
+
+# 워커 실행 명령어
+CMD ["python", "app/worker_main.py"] 

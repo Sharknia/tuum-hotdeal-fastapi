@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ko">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>핫딜 키워드 관리 - tuum.day</title>
+        <link rel="stylesheet" href="./style.css" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    </head>
+    <body class="hotdeal-page">
+        <nav class="main-nav">
+            <div class="nav-content">
+                <div class="nav-left">
+                    <img
+                        src="https://ktlnpawucfuxjbufkplf.supabase.co/storage/v1/object/public/pb//tuum.png"
+                        alt="tuum.day 로고"
+                        class="nav-logo"
+                    />
+                    <h1>tuum.day</h1>
+                </div>
+                <div class="nav-right">
+                    <span id="user-nickname"></span>
+                    <button id="logout-button" class="nav-button"><i class="fas fa-sign-out-alt"></i> 로그아웃</button>
+                </div>
+            </div>
+        </nav>
+
+        <main class="hotdeal-content">
+            <section class="add-hotdeal-section">
+                <h2><i class="fas fa-plus-circle"></i> 핫딜 키워드 추가</h2>
+                <form id="add-hotdeal-keyword-form">
+                    <input type="text" id="hotdeal-keyword-input" placeholder="추가할 키워드를 입력하세요" required />
+                    <button type="submit"><i class="fas fa-plus"></i> 추가</button>
+                </form>
+            </section>
+            <section class="hotdeal-keyword-list-section">
+                <h2><i class="fas fa-list"></i> 키워드 목록</h2>
+                <ul id="hotdeal-keyword-list">
+                    <!-- 키워드 목록은 스크립트로 동적 생성됩니다 -->
+                </ul>
+            </section>
+        </main>
+        <script src="./js/auth.js?v=1.0.0"></script>
+        <script src="./js/keyword_manager.js?v=1.0.0"></script>
+        <script>
+            (async () => {
+                const isLogin = await checkLoginStatus();
+                if (!isLogin) {
+                    window.location.href = '/login';
+                    return;
+                }
+
+                async function startApp() {
+                    // 키워드 목록 로드
+                    await loadKeywords();
+
+                    // 키워드 추가 폼 이벤트 리스너
+                    const addForm = document.getElementById('add-hotdeal-keyword-form');
+                    addForm.addEventListener('submit', async (event) => {
+                        event.preventDefault();
+                        const input = document.getElementById('hotdeal-keyword-input');
+                        await addKeyword(input.value);
+                    });
+
+                    // 키워드 삭제 버튼 이벤트 리스너 (이벤트 위임 방식 사용)
+                    const keywordList = document.getElementById('hotdeal-keyword-list');
+                    keywordList.addEventListener('click', async (event) => {
+                        if (event.target.closest('.delete-button')) {
+                            const listItem = event.target.closest('li');
+                            const keywordId = listItem.dataset.id;
+                            if (keywordId) {
+                                await deleteKeyword(keywordId);
+                            } else {
+                                console.error('삭제할 키워드의 ID를 찾을 수 없습니다.');
+                            }
+                        }
+                    });
+                    const userInfo = await getUserInfo();
+
+                    const logoutButton = document.getElementById('logout-button');
+                    if (logoutButton) {
+                        logoutButton.addEventListener('click', () => {
+                            if (confirm('정말로 로그아웃하시겠습니까?')) {
+                                logout();
+                            }
+                        });
+                    }
+
+                    if (userInfo) {
+                        if (document.getElementById('user-nickname')) {
+                            document.getElementById('user-nickname').textContent = userInfo.nickname;
+                        }
+                    }
+                }
+
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', startApp);
+                } else {
+                    await startApp();
+                }
+            })();
+        </script>
+    </body>
+</html>
