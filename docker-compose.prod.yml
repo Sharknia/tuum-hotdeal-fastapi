@@ -1,0 +1,17 @@
+services:
+  web:
+    image: ghcr.io/sharknia/tuum-hotdeal-fastapi:latest
+    container_name: tuum-hotdeal-api
+    environment:
+      - DOPPLER_TOKEN=${DOPPLER_TOKEN}
+    ports:
+      - "10000:8000"
+    restart: unless-stopped
+
+  worker:
+    image: ghcr.io/sharknia/tuum-hotdeal-fastapi:latest
+    container_name: tuum-hotdeal-worker
+    environment:
+      - DOPPLER_TOKEN=${DOPPLER_TOKEN}
+    command: ["doppler", "run", "--", "python", "app/worker_main.py"]
+    restart: unless-stopped

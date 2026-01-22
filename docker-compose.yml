@@ -1,7 +1,7 @@
 services:
     web:
         build: .
-        container_name: llm_chat_web
+        container_name: tuum-hotdeal-api-dev
         command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
         env_file:
             - .env

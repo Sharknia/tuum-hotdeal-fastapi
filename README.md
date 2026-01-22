@@ -1,5 +1,9 @@
 # tuum.day - 핫딜 알림 서비스
 
+> ⚠️ **학습 목적 프로젝트**  
+> 이 프로젝트는 FastAPI, Docker, CI/CD 등 백엔드 기술 스택 학습을 위해 제작되었습니다.  
+> 프로덕션 서비스가 아니며, 학습 및 참고 용도로만 사용해주세요.
+
 사용자가 관심 키워드를 등록하면, 핫딜 사이트를 주기적으로 크롤링하여 새로운 핫딜 발견 시 이메일로 알림을 보내주는 서비스입니다.
 
 ## 주요 기능
@@ -20,7 +24,8 @@
 | **Email** | aiosmtplib |
 | **Auth** | JWT (python-jose), bcrypt |
 | **Frontend** | Vanilla HTML/CSS/JS |
-| **Infra** | Docker, Docker Compose |
+| **Infra** | Docker, GitHub Actions, GHCR |
+| **Secrets** | Doppler |
 
 ## 설정
 
@@ -127,10 +132,54 @@ poetry run python -m app.worker_main
 ├── static/                  # 웹 프론트엔드 (HTML/CSS/JS)
 ├── tests/                   # 테스트 코드
 ├── alembic/                 # DB 마이그레이션
-├── Dockerfile               # API 서버용
-├── Dockerfile.worker        # 워커용
+├── Dockerfile               # API 서버 및 워커 (통합 이미지)
 └── docker-compose.yml       # 개발 환경 설정
 ```
+
+## CI/CD
+
+### 개요
+
+`main` 브랜치에 push되면 GitHub Actions가 자동으로 테스트, 빌드, 배포를 수행합니다.
+
+```
+Push to main → Test → Build → Deploy → Tag
+```
+
+### 파이프라인 단계
+
+| 단계 | 설명 |
+|------|------|
+| **Test** | Ruff 린트 + Pytest 테스트 실행 |
+| **Build** | Docker 이미지 빌드 → GHCR에 푸시 |
+| **Deploy** | SSH로 서버 접속 → 이미지 pull → 컨테이너 재시작 |
+| **Tag** | `deploy-YYYYMMDD-SHA` 형식의 배포 태그 생성 |
+
+### 시크릿 관리 (Doppler)
+
+환경변수는 [Doppler](https://doppler.com)를 통해 관리됩니다. 서버에 `.env` 파일을 두지 않고, 컨테이너 실행 시 Doppler CLI가 런타임에 환경변수를 주입합니다.
+
+```dockerfile
+ENTRYPOINT ["doppler", "run", "--"]
+CMD ["uvicorn", "app.main:app", ...]
+```
+
+**장점:**
+- 서버에 시크릿 파일이 존재하지 않음
+- 중앙 집중식 환경변수 관리
+- 환경변수 변경 시 컨테이너 재시작만으로 반영
+
+### 배포 환경
+
+| 항목 | 값 |
+|------|-----|
+| **이미지 레지스트리** | `ghcr.io/sharknia/tuum-hotdeal-fastapi` |
+| **서버 경로** | `~/app/tuum-hotdeal-fastapi` |
+| **포트** | 10000 (nginx 리버스 프록시 연결) |
+
+### 초기 설정
+
+배포 환경 설정은 [`DEPLOYMENT_SETUP.md`](./DEPLOYMENT_SETUP.md)를 참조하세요.
 
 ## API 엔드포인트
 
@@ -141,6 +190,7 @@ poetry run python -m app.worker_main
 | GET | `/api/hotdeal/keywords` | 키워드 목록 조회 |
 | POST | `/api/hotdeal/keywords` | 키워드 등록 |
 | DELETE | `/api/hotdeal/keywords/{id}` | 키워드 삭제 |
+| GET | `/health` | 헬스체크 |
 
 ## 라이선스
 
