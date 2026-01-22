@@ -90,6 +90,7 @@ jobs:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
           DEPLOY_PATH: ~/app/tuum-hotdeal-fastapi
         run: |
+          ssh ${SSH_USER}@${SSH_HOST} "mkdir -p ${DEPLOY_PATH}"
           scp docker-compose.prod.yml ${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/
           ssh ${SSH_USER}@${SSH_HOST} << EOF
             cd ${DEPLOY_PATH}
