@@ -1,12 +1,40 @@
 services:
+    db:
+        image: postgres:16-alpine
+        container_name: tuum-hotdeal-db
+        environment:
+            POSTGRES_USER: tuum
+            POSTGRES_PASSWORD: tuum1234
+            POSTGRES_DB: tuum_hotdeal
+        ports:
+            - '5433:5432'
+        volumes:
+            - tuum-db-data:/var/lib/postgresql/data
+        healthcheck:
+            test: ['CMD-SHELL', 'pg_isready -U tuum -d tuum_hotdeal']
+            interval: 5s
+            timeout: 5s
+            retries: 5
+
     web:
         build: .
         container_name: tuum-hotdeal-api-dev
         command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-        env_file:
-            - .env
+        environment:
+            DATABASE_URL: postgresql+asyncpg://tuum:tuum1234@db:5432/tuum_hotdeal
+            PASSWORD_SECRET_KEY: local-password-secret-key-12345
+            EMAIL_SECRET_KEY: local-email-secret-key-12345
+            REFRESH_TOKEN_SECRET_KEY: local-refresh-token-secret-key-12345
+            ENVIRONMENT: local
+            DEBUG: 'true'
         volumes:
             - .:/app
         ports:
             - '8001:8000'
         restart: unless-stopped
+        depends_on:
+            db:
+                condition: service_healthy
+
+volumes:
+    tuum-db-data:

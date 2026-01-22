@@ -1,4 +1,5 @@
 from collections.abc import AsyncGenerator
+from unittest.mock import AsyncMock, patch
 from uuid import UUID, uuid4
 
 import pytest
@@ -34,6 +35,17 @@ engine = create_async_engine(
 SessionLocal = async_sessionmaker(
     bind=engine, class_=AsyncSession, expire_on_commit=False
 )
+
+
+@pytest.fixture(autouse=True)
+def mock_send_email():
+    """메일 발송을 mock 처리하여 실제 SMTP 연결 방지"""
+    with patch(
+        "app.src.Infrastructure.mail.mail_manager.send_email",
+        new_callable=AsyncMock,
+    ) as mock:
+        mock.return_value = None
+        yield mock
 
 
 @pytest_asyncio.fixture

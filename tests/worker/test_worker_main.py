@@ -1,6 +1,6 @@
-import httpx
 from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -64,7 +64,7 @@ async def test_get_new_hotdeal_keywords_first_crawl(
 ):
     """
     시나리오 1: 키워드가 처음으로 크롤링될 때
-    - 기대: 크롤링된 모든 항목이 '새로운 핫딜'로 반환되고, 첫 번째 항목이 DB에 저장되어야 함
+    - 기대: 첫 크롤링 시 스팸 방지를 위해 최신 1개만 '새로운 핫딜'로 반환되고, DB에 저장되어야 함
     """
     # GIVEN: 크롤러가 CRAWLED_DATA_NEW를 반환하도록 모킹
     with patch(
@@ -75,8 +75,8 @@ async def test_get_new_hotdeal_keywords_first_crawl(
             # WHEN: 새로운 핫딜을 조회
             new_deals = await get_new_hotdeal_keywords(mock_db_session, keyword_in_db, client)
 
-            # THEN: 모든 결과가 반환되어야 함
-            assert len(new_deals) == 3
+            # THEN: 첫 크롤링이므로 최신 1개만 반환되어야 함
+            assert len(new_deals) == 1
             assert new_deals[0].id == "101"
 
             # AND: 첫 번째 결과가 DB에 저장되어야 함
