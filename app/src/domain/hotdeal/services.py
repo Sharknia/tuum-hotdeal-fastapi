@@ -41,8 +41,11 @@ async def register_keyword(
         keyword = await create_keyword(db, title)
     # 유저 정보 조회
     user = await get_user_by_id(db, user_id)
+    # 유저가 존재하지 않으면 에러
+    if not user:
+        raise ClientErrors.USER_NOT_FOUND
     # 내 키워드 갯수 확인, 지금 이미 10개라면 추가 불가 (zel@kakao.com 제외)
-    if user and user.email != "zel@kakao.com":
+    if user.email != "zel@kakao.com":
         my_keyword_count: int = await get_my_keyword_count(db, user_id)
         if my_keyword_count >= 10:
             raise ClientErrors.KEYWORD_COUNT_OVERFLOW
@@ -53,24 +56,23 @@ async def register_keyword(
         raise ClientErrors.DUPLICATE_KEYWORD_REGISTRATION from None
 
     # --- 백그라운드에서 이메일 발송 ---
-    if user:
-        subject = f"'{title}' 키워드가 등록되었습니다."
-        body = f"""
-        <html>
-        <body>
-            <h2>키워드 등록이 완료되었습니다.</h2>
-            <p>안녕하세요, {user.nickname}님.</p>
-            <p>요청하신 키워드 '<b>{title}</b>'이(가) 성공적으로 등록되었습니다.</p>
-            <p>이제부터 '{title}'에 대한 새로운 핫딜을 찾아 알려드릴게요.</p>
-            <br>
-            <hr>
-            <p><small>본 메일은 발신전용입니다.</small></p>
-        </body>
-        </html>
-        """
-        asyncio.create_task(
-            send_email(subject=subject, to=user.email, body=body, is_html=True)
-        )
+    subject = f"'{title}' 키워드가 등록되었습니다."
+    body = f"""
+    <html>
+    <body>
+        <h2>키워드 등록이 완료되었습니다.</h2>
+        <p>안녕하세요, {user.nickname}님.</p>
+        <p>요청하신 키워드 '<b>{title}</b>'이(가) 성공적으로 등록되었습니다.</p>
+        <p>이제부터 '{title}'에 대한 새로운 핫딜을 찾아 알려드릴게요.</p>
+        <br>
+        <hr>
+        <p><small>본 메일은 발신전용입니다.</small></p>
+    </body>
+    </html>
+    """
+    asyncio.create_task(
+        send_email(subject=subject, to=user.email, body=body, is_html=True)
+    )
 
     return KeywordResponse(
         id=keyword.id,

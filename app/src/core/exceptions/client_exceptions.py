@@ -31,3 +31,10 @@ class ClientErrors:
         detail="Invalid keyword title",
         description="INVALID KEYWORD TITLE",
     )
+
+    # 사용자를 찾을 수 없음
+    USER_NOT_FOUND = BaseHTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="User not found",
+        description="USER NOT FOUND",
+    )

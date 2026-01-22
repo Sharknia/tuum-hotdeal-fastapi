@@ -15,7 +15,8 @@ async def make_hotdeal_email_content(
     """
     핫딜 업데이트 내용을 메일 형식으로 변환
     """
-    text = f"<h2><a href='https://www.algumon.com/search/{keyword.title}'>{keyword.title} 검색 결과</a></h2>"
+    search_url = f"https://www.algumon.com/search/{keyword.title}"
+    text = f"<h2><a href='{search_url}'>{keyword.title} 검색 결과</a></h2>"
     product_list_html = "".join(
         [
             f"<p><a href='{product.link}'>{product.title}</a> - {product.price}</p>"
@@ -27,11 +28,11 @@ async def make_hotdeal_email_content(
 
 
 async def send_email(
-    subject: str = "메일 제목",
-    to: str = "zel@kakao.com",
-    sender: str = "zel@kakao.com",
-    body: str = None,
-    is_html: str = False,
+    subject: str,
+    to: str,
+    body: str = "",
+    sender: str = settings.SMTP_FROM,
+    is_html: bool = False,
 ):
     try:
         msg = MIMEText(body, "html" if is_html else "plain")  # HTML 형식 지원

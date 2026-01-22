@@ -204,3 +204,21 @@ async def test_register_keyword_unlimited_for_admin_user(
         user_id=admin_user.id,
     )
     assert len(keywords) == 15
+
+
+@pytest.mark.asyncio
+async def test_register_keyword_fails_when_user_not_found(
+    mock_db_session: AsyncSession,
+):
+    """존재하지 않는 user_id로 키워드 등록 시 USER_NOT_FOUND 에러"""
+    fake_user_id = UUID("99999999-9999-9999-9999-999999999999")
+
+    with pytest.raises(BaseHTTPException) as exc_info:
+        await register_keyword(
+            db=mock_db_session,
+            title="테스트키워드",
+            user_id=fake_user_id,
+        )
+
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.detail == "User not found"
