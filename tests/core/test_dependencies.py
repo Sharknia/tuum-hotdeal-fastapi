@@ -9,9 +9,7 @@ from app.src.core.dependencies.db_session import get_db
 
 @pytest.mark.asyncio
 async def test_get_db_yields_session_and_closes():
-    """
-    get_db가 AsyncSession을 yield하고, 컨텍스트 종료 시 세션이 닫히는지 테스트 (모킹 사용)
-    """
+    """get_db가 AsyncSession을 yield하고, 컨텍스트 종료 시 세션이 닫히는지 테스트."""
     mock_session = AsyncMock(spec=AsyncSession)
 
     # AsyncSessionLocal 팩토리 모킹 경로 수정 (db_session 모듈 내의 경로로)

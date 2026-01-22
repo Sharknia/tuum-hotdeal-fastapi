@@ -13,14 +13,24 @@ from app.worker_main import get_new_hotdeal_keywords, job
 # --- 테스트 데이터 ---
 
 CRAWLED_DATA_NEW = [
-    CrawledKeyword(id="101", title="[새상품] 키보드", link="new_link1", price="10000원"),
-    CrawledKeyword(id="102", title="[새상품] 마우스", link="new_link2", price="20000원"),
-    CrawledKeyword(id="103", title="[기존상품] 모니터", link="old_link3", price="30000원"),
+    CrawledKeyword(
+        id="101", title="[새상품] 키보드", link="new_link1", price="10000원"
+    ),
+    CrawledKeyword(
+        id="102", title="[새상품] 마우스", link="new_link2", price="20000원"
+    ),
+    CrawledKeyword(
+        id="103", title="[기존상품] 모니터", link="old_link3", price="30000원"
+    ),
 ]
 
 CRAWLED_DATA_NO_NEW = [
-    CrawledKeyword(id="103", title="[기존상품] 모니터", link="old_link3", price="30000원"),
-    CrawledKeyword(id="104", title="[기존상품] 스피커", link="old_link4", price="40000원"),
+    CrawledKeyword(
+        id="103", title="[기존상품] 모니터", link="old_link3", price="30000원"
+    ),
+    CrawledKeyword(
+        id="104", title="[기존상품] 스피커", link="old_link4", price="40000원"
+    ),
 ]
 
 
@@ -64,7 +74,7 @@ async def test_get_new_hotdeal_keywords_first_crawl(
 ):
     """
     시나리오 1: 키워드가 처음으로 크롤링될 때
-    - 기대: 첫 크롤링 시 스팸 방지를 위해 최신 1개만 '새로운 핫딜'로 반환되고, DB에 저장되어야 함
+    - 기대: 첫 크롤링 시 스팸 방지를 위해 최신 1개만 반환되고, DB에 저장되어야 함
     """
     # GIVEN: 크롤러가 CRAWLED_DATA_NEW를 반환하도록 모킹
     with patch(
@@ -73,7 +83,9 @@ async def test_get_new_hotdeal_keywords_first_crawl(
         mock_fetch.return_value = CRAWLED_DATA_NEW
         async with httpx.AsyncClient() as client:
             # WHEN: 새로운 핫딜을 조회
-            new_deals = await get_new_hotdeal_keywords(mock_db_session, keyword_in_db, client)
+            new_deals = await get_new_hotdeal_keywords(
+                mock_db_session, keyword_in_db, client
+            )
 
             # THEN: 첫 크롤링이므로 최신 1개만 반환되어야 함
             assert len(new_deals) == 1
@@ -116,7 +128,7 @@ async def test_get_new_hotdeal_keywords_with_new_deals(
 ):
     """
     시나리오 3: 새로운 핫딜이 발견되었을 때
-    - 기대: 이전에 저장된 핫딜을 제외한 새로운 항목만 반환되고, DB는 최신 핫딜로 업데이트되어야 함
+    - 기대: 이전 핫딜 제외한 새 항목만 반환되고, DB는 최신 핫딜로 업데이트
     """
     # GIVEN: 크롤러가 새로운 핫딜이 포함된 목록을 반환하도록 모킹
     keyword, old_site_data = keyword_and_site_in_db
@@ -144,26 +156,36 @@ async def test_job_e2e(mock_db_session, keyword_in_db):
     """E2E 테스트: job 함수가 올바르게 동작하는지 검증"""
     # GIVEN: DB에 사용자, 키워드, 사용자-키워드 관계 설정
     from app.src.domain.user.models import User
-    user = User(email="test@example.com", nickname="testuser", hashed_password="hashed_password")
+
+    user = User(
+        email="test@example.com",
+        nickname="testuser",
+        hashed_password="hashed_password",
+    )
     user.keywords.append(keyword_in_db)
     mock_db_session.add(user)
     await mock_db_session.commit()
 
     # GIVEN: 크롤링, 메일 발송, DB 조회 모킹
-    with patch("app.worker_main.get_new_hotdeal_keywords", new_callable=AsyncMock) as mock_get_new:
-        with patch("app.worker_main.send_email", new_callable=AsyncMock) as mock_send_email:
-            with patch("app.worker_main.AsyncSessionLocal", return_value=mock_db_session):
-                with patch("app.worker_main.settings.ENVIRONMENT", "prod"):
+    with (
+        patch(
+            "app.worker_main.get_new_hotdeal_keywords", new_callable=AsyncMock
+        ) as mock_get_new,
+        patch(
+            "app.worker_main.send_email", new_callable=AsyncMock
+        ) as mock_send_email,
+        patch("app.worker_main.AsyncSessionLocal", return_value=mock_db_session),
+        patch("app.worker_main.settings.ENVIRONMENT", "prod"),
+    ):
+        mock_get_new.return_value = CRAWLED_DATA_NEW
+        mock_send_email.return_value = None
 
-                    mock_get_new.return_value = CRAWLED_DATA_NEW
-                    mock_send_email.return_value = None  # Ensure the mock returns a completed coroutine
+        # WHEN: job 실행
+        await job()
 
-                    # WHEN: job 실행
-                    await job()
-
-                    # THEN: 메일 발송 함수가 올바른 인자와 함께 1회 호출되었는지 확인
-                    mock_send_email.assert_called_once()
-                    args, kwargs = mock_send_email.call_args
-                    assert kwargs["to"] == "test@example.com"
-                    assert "테스트키워드" in kwargs["subject"]
-                    assert "[새상품] 키보드" in kwargs["body"]
+        # THEN: 메일 발송 함수가 올바른 인자와 함께 1회 호출되었는지 확인
+        mock_send_email.assert_called_once()
+        args, kwargs = mock_send_email.call_args
+        assert kwargs["to"] == "test@example.com"
+        assert "테스트키워드" in kwargs["subject"]
+        assert "[새상품] 키보드" in kwargs["body"]
