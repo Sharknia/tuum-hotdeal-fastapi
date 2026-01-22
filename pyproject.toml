@@ -37,7 +37,8 @@ requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
-line-length = 88
+line-length = 120
+exclude = ["alembic/"]
 
 [tool.ruff.lint]
 select = [
@@ -49,6 +50,12 @@ select = [
     "I",  # Import 정리 (isort)
     "W", # 경고
 ]
+ignore = [
+    "B008",  # FastAPI Depends() 패턴 허용
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"
