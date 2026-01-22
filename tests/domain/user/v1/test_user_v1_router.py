@@ -2,7 +2,6 @@ import pytest
 from fastapi import Response
 
 from app.src.core.exceptions.auth_excptions import AuthErrors
-from app.src.domain.user.models import User
 from app.src.domain.user.schemas import LogoutResponse
 
 
@@ -49,7 +48,7 @@ async def test_post_user(
 ):
     """회원가입 API 테스트"""
     # 중복 검사를 위한 기존 유저 추가
-    user: User = await add_mock_user(
+    await add_mock_user(
         email="duplicate@example.com",
         password="password123",
         nickname="duplicate_user",
@@ -148,7 +147,7 @@ async def test_post_user_login(
 ):
     """로그인 API 테스트"""
     # 정상 유저 추가
-    user: User = await add_mock_user(
+    await add_mock_user(
         email="test@example.com",
         password="password123",
         nickname="test_user",

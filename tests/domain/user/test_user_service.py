@@ -49,7 +49,7 @@ async def test_create_new_user(
 ):
     """회원가입 서비스 테스트"""
     # 중복 검사를 위한 기존 유저 추가
-    user: User = await add_mock_user(
+    await add_mock_user(
         email="duplicate@example.com",
         password="password123",
         nickname="duplicate_user",
@@ -124,7 +124,7 @@ async def test_login_user(
 ):
     """로그인 서비스 테스트"""
     # 정상 로그인 테스트를 위한 유저 추가
-    user: User = await add_mock_user(
+    added_user: User = await add_mock_user(
         email="test@example.com",
         password="securepassword",
         nickname="test_user",
@@ -153,7 +153,7 @@ async def test_login_user(
         )
         assert isinstance(result, LoginResponse)
         assert result.access_token is not None
-        assert result.user_id == str(user.id)
+        assert result.user_id == str(added_user.id)
 
 
 @pytest.mark.asyncio
@@ -191,7 +191,7 @@ async def test_refresh_access_token(
     response = Response()
     # 테스트를 위한 초기 데이터 추가
     if email == "test@example.com":
-        user: User = await add_mock_user(
+        await add_mock_user(
             id=UUID("00000000-0000-0000-0000-00000000000a"),
             is_active=True,
             nickname="test_user",

@@ -37,6 +37,8 @@ elif settings.ENVIRONMENT == "prod":
         "https://tuum.day",
         "https://api.tuum.day",
     ]
+else:
+    origins = []
 
 
 # Lifespan 핸들러
@@ -101,9 +103,11 @@ async def base_http_exception_handler(
     request: Request,
     exc: BaseHTTPException,
 ):
-    # 로그 남기기
     logger.error(
-        f"Error occurred: {exc.detail}, Status Code: {exc.status_code}, Description: {exc.description}"
+        "Error: %s, Status: %s, Desc: %s",
+        exc.detail,
+        exc.status_code,
+        exc.description,
     )
 
     return JSONResponse(
