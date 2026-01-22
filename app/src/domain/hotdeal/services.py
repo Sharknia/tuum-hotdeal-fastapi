@@ -39,10 +39,13 @@ async def register_keyword(
     # 존재하지 않을 경우 키워드 등록
     if keyword is None:
         keyword = await create_keyword(db, title)
-    # 내 키워드 갯수 확인, 지금 이미 10개라면 추가 불가
-    my_keyword_count: int = await get_my_keyword_count(db, user_id)
-    if my_keyword_count >= 10:
-        raise ClientErrors.KEYWORD_COUNT_OVERFLOW
+    # 유저 정보 조회
+    user = await get_user_by_id(db, user_id)
+    # 내 키워드 갯수 확인, 지금 이미 10개라면 추가 불가 (zel@kakao.com 제외)
+    if user and user.email != "zel@kakao.com":
+        my_keyword_count: int = await get_my_keyword_count(db, user_id)
+        if my_keyword_count >= 10:
+            raise ClientErrors.KEYWORD_COUNT_OVERFLOW
     # 내 키워드로 등록
     try:
         await add_my_keyword(db, user_id, keyword.id)
@@ -50,7 +53,6 @@ async def register_keyword(
         raise ClientErrors.DUPLICATE_KEYWORD_REGISTRATION
 
     # --- 백그라운드에서 이메일 발송 ---
-    user = await get_user_by_id(db, user_id)
     if user:
         subject = f"'{title}' 키워드가 등록되었습니다."
         body = f"""
