@@ -91,6 +91,11 @@ app.include_router(hotdeal_router.router, prefix="/api/hotdeal")
 app.include_router(admin_router.router, prefix="/api")
 
 
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+
 @app.exception_handler(BaseHTTPException)
 async def base_http_exception_handler(
     request: Request,
