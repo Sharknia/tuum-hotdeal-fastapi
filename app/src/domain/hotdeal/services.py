@@ -49,8 +49,8 @@ async def register_keyword(
     # 내 키워드로 등록
     try:
         await add_my_keyword(db, user_id, keyword.id)
-    except:
-        raise ClientErrors.DUPLICATE_KEYWORD_REGISTRATION
+    except Exception:
+        raise ClientErrors.DUPLICATE_KEYWORD_REGISTRATION from None
 
     # --- 백그라운드에서 이메일 발송 ---
     if user:
