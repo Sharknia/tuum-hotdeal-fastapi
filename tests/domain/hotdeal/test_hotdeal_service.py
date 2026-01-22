@@ -171,3 +171,36 @@ async def test_view_users_keywords(
     )
     assert len(result) == 1
     assert result[0].title == "keyword"
+
+
+@pytest.mark.asyncio
+async def test_register_keyword_unlimited_for_admin_user(
+    add_mock_user,
+    mock_db_session: AsyncSession,
+):
+    """zel@kakao.com 사용자는 키워드 10개 제한 없이 무제한 등록 가능"""
+    # 특별 사용자 생성
+    admin_user = await add_mock_user(
+        id=UUID("00000000-0000-0000-0000-00000000000b"),
+        email="zel@kakao.com",
+        is_active=True,
+        nickname="admin_user",
+        password="validpassword",
+    )
+
+    # 15개 키워드 등록 시도 - 모두 성공해야 함
+    for i in range(15):
+        result = await register_keyword(
+            db=mock_db_session,
+            title=f"AdminKeyword{i}",
+            user_id=admin_user.id,
+        )
+        assert isinstance(result, KeywordResponse)
+        assert result.title == f"adminkeyword{i}"
+
+    # 키워드 목록 확인
+    keywords = await view_users_keywords(
+        db=mock_db_session,
+        user_id=admin_user.id,
+    )
+    assert len(keywords) == 15
