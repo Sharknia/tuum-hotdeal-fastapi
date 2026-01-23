@@ -26,12 +26,10 @@ class TestCrawlerRegistry:
         assert crawler.keyword == "테스트키워드"
         assert crawler.client is mock_client
 
-    def test_get_crawler_raises_for_unregistered_site(self):
-        """등록되지 않은 사이트는 ValueError를 발생시켜야 함"""
-        mock_client = MagicMock()
-
-        with pytest.raises(ValueError, match="Unsupported site"):
-            get_crawler(SiteName.FMKOREA, "테스트키워드", mock_client)
+    def test_all_site_names_are_registered(self):
+        """모든 SiteName enum이 레지스트리에 등록되어 있어야 함"""
+        for site in SiteName:
+            assert site in CRAWLER_REGISTRY, f"{site} is not registered in CRAWLER_REGISTRY"
 
     def test_get_active_sites_returns_registered_sites(self):
         """get_active_sites는 등록된 모든 사이트를 반환해야 함"""
