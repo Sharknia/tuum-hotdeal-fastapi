@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -27,14 +27,26 @@ class TestFmkoreaCrawlerProperties:
 
         assert crawler.requires_browser is True
 
-    def test_url_property(self):
-        """url 속성이 올바른 핫딜 게시판 URL을 반환해야 함"""
+    def test_url_property_returns_search_url(self):
+        """url 속성이 검색 URL을 반환해야 함"""
         from app.src.Infrastructure.crawling.crawlers.fmkorea import FmkoreaCrawler
 
         mock_client = MagicMock()
         crawler = FmkoreaCrawler(keyword="아이폰", client=mock_client)
 
-        assert crawler.url == "https://www.fmkorea.com/hotdeal"
+        expected = "https://www.fmkorea.com/search.php?mid=hotdeal&search_keyword=%EC%95%84%EC%9D%B4%ED%8F%B0&search_target=title_content"
+        assert crawler.url == expected
+
+    def test_url_property_encodes_keyword(self):
+        """url 속성이 키워드를 URL 인코딩해야 함"""
+        from app.src.Infrastructure.crawling.crawlers.fmkorea import FmkoreaCrawler
+
+        mock_client = MagicMock()
+        crawler = FmkoreaCrawler(keyword="맥북 프로", client=mock_client)
+
+        assert "search_keyword=" in crawler.url
+        assert "%EB%A7%A5%EB%B6%81" in crawler.url  # 맥북
+        assert "%ED%94%84%EB%A1%9C" in crawler.url  # 프로
 
     def test_site_name_property(self):
         """site_name 속성이 SiteName.FMKOREA를 반환해야 함"""
@@ -60,12 +72,12 @@ class TestFmkoreaCrawlerParse:
 
     @pytest.fixture
     def sample_html(self):
-        """FM코리아 핫딜 게시판 샘플 HTML (실제 구조: div.li)"""
+        """FM코리아 검색 결과 샘플 HTML (검색 결과 페이지 형식)"""
         return """
         <div class="fm_best_widget">
             <div class="li">
                 <div class="title">
-                    <a href="/7953041">[11번가] 아이폰 15 프로 자급제 1,190,000원</a>
+                    <a href="/index.php?mid=hotdeal&amp;document_srl=7953041&amp;search_keyword=test">[11번가] 아이폰 15 프로 자급제 1,190,000원</a>
                 </div>
                 <div class="hotdeal_info">
                     <span>쇼핑몰: <a href="#">11번가</a></span>
@@ -75,46 +87,20 @@ class TestFmkoreaCrawlerParse:
             </div>
             <div class="li">
                 <div class="title">
-                    <a href="/7952999">[쿠팡] 맥북 에어 M3 15인치 1,490,000원</a>
+                    <a href="/index.php?mid=hotdeal&amp;document_srl=7952999&amp;search_keyword=test">[쿠팡] 아이폰 14 할인</a>
                 </div>
                 <div class="hotdeal_info">
                     <span>쇼핑몰: <a href="#">쿠팡</a></span>
-                    <span>가격: <a href="#">1,490,000원</a></span>
+                    <span>가격: <a href="#">990,000원</a></span>
                 </div>
             </div>
             <div class="li hotdeal_var8Y">
                 <div class="title">
-                    <a href="/7950000">[종료] 에어팟 프로 2 품절</a>
+                    <a href="/index.php?mid=hotdeal&amp;document_srl=7950000&amp;search_keyword=test">[종료] 아이폰 13 품절</a>
                 </div>
                 <div class="hotdeal_info">
                     <span>쇼핑몰: <a href="#">네이버</a></span>
                     <span>가격: <a href="#">299,000원</a></span>
-                </div>
-            </div>
-        </div>
-        """
-
-    @pytest.fixture
-    def sample_html_with_keyword(self):
-        """키워드(아이폰)가 포함된 샘플 HTML"""
-        return """
-        <div class="fm_best_widget">
-            <div class="li">
-                <div class="title">
-                    <a href="/7953041">[11번가] 아이폰 15 프로 자급제 1,190,000원</a>
-                </div>
-                <div class="hotdeal_info">
-                    <span>쇼핑몰: <a href="#">11번가</a></span>
-                    <span>가격: <a href="#">1,190,000원</a></span>
-                </div>
-            </div>
-            <div class="li">
-                <div class="title">
-                    <a href="/7952888">[쿠팡] 갤럭시 S24 울트라 할인</a>
-                </div>
-                <div class="hotdeal_info">
-                    <span>쇼핑몰: <a href="#">쿠팡</a></span>
-                    <span>가격: <a href="#">1,299,000원</a></span>
                 </div>
             </div>
         </div>
@@ -135,46 +121,47 @@ class TestFmkoreaCrawlerParse:
         assert isinstance(result, list)
         assert all(isinstance(item, CrawledKeyword) for item in result)
 
-    def test_parse_filters_by_keyword(self, crawler, sample_html_with_keyword):
-        """parse()는 키워드가 포함된 게시물만 반환해야 함"""
-        result = crawler.parse(sample_html_with_keyword)
+    def test_parse_extracts_all_matching_items(self, crawler, sample_html):
+        """parse()는 검색 결과의 모든 아이템을 반환해야 함 (종료된 딜 제외)"""
+        result = crawler.parse(sample_html)
 
-        assert len(result) == 1
-        assert "아이폰" in result[0].title
+        assert len(result) == 2
+        assert all("아이폰" in item.title for item in result)
 
-    def test_parse_extracts_correct_id(self, crawler, sample_html_with_keyword):
+    def test_parse_extracts_correct_id(self, crawler, sample_html):
         """parse()는 게시물 ID를 올바르게 추출해야 함"""
-        result = crawler.parse(sample_html_with_keyword)
+        result = crawler.parse(sample_html)
 
         assert result[0].id == "7953041"
+        assert result[1].id == "7952999"
 
-    def test_parse_extracts_correct_title(self, crawler, sample_html_with_keyword):
+    def test_parse_extracts_correct_title(self, crawler, sample_html):
         """parse()는 제목을 올바르게 추출해야 함"""
-        result = crawler.parse(sample_html_with_keyword)
+        result = crawler.parse(sample_html)
 
         assert "[11번가] 아이폰 15 프로 자급제 1,190,000원" in result[0].title
 
-    def test_parse_extracts_correct_link(self, crawler, sample_html_with_keyword):
+    def test_parse_extracts_correct_link(self, crawler, sample_html):
         """parse()는 링크를 올바르게 추출해야 함"""
-        result = crawler.parse(sample_html_with_keyword)
+        result = crawler.parse(sample_html)
 
         assert result[0].link == "https://www.fmkorea.com/7953041"
 
-    def test_parse_extracts_price_from_hotdeal_info(self, crawler, sample_html_with_keyword):
+    def test_parse_extracts_price_from_hotdeal_info(self, crawler, sample_html):
         """parse()는 hotdeal_info에서 가격을 추출해야 함"""
-        result = crawler.parse(sample_html_with_keyword)
+        result = crawler.parse(sample_html)
 
         assert result[0].price == "1,190,000원"
 
-    def test_parse_sets_site_name(self, crawler, sample_html_with_keyword):
+    def test_parse_sets_site_name(self, crawler, sample_html):
         """parse()는 site_name을 설정해야 함"""
-        result = crawler.parse(sample_html_with_keyword)
+        result = crawler.parse(sample_html)
 
         assert result[0].site_name == SiteName.FMKOREA
 
-    def test_parse_sets_search_url(self, crawler, sample_html_with_keyword):
+    def test_parse_sets_search_url(self, crawler, sample_html):
         """parse()는 search_url을 설정해야 함"""
-        result = crawler.parse(sample_html_with_keyword)
+        result = crawler.parse(sample_html)
 
         assert result[0].search_url == crawler.search_url
 
@@ -190,209 +177,6 @@ class TestFmkoreaCrawlerParse:
         result = crawler.parse("<html><body>No content</body></html>")
 
         assert result == []
-
-    def test_parse_returns_empty_when_keyword_not_found(self, crawler):
-        """키워드가 없는 게시물만 있으면 빈 리스트를 반환해야 함"""
-        html = """
-        <div class="fm_best_widget">
-            <div class="li">
-                <div class="title">
-                    <a href="/123456">[쿠팡] 갤럭시 S24 할인</a>
-                </div>
-                <div class="hotdeal_info">
-                    <span>쇼핑몰: <a href="#">쿠팡</a></span>
-                </div>
-            </div>
-        </div>
-        """
-        result = crawler.parse(html)
-
-        assert result == []
-
-
-class TestFmkoreaCrawlerPagination:
-    """FmkoreaCrawler 페이지네이션 테스트"""
-
-    @pytest.fixture
-    def crawler(self):
-        """FmkoreaCrawler 인스턴스"""
-        from app.src.Infrastructure.crawling.crawlers.fmkorea import FmkoreaCrawler
-
-        mock_client = MagicMock()
-        return FmkoreaCrawler(keyword="아이폰", client=mock_client)
-
-    def test_max_pages_default_value(self, crawler):
-        """max_pages 기본값이 3이어야 함"""
-        assert crawler.max_pages == 3
-
-    def test_get_page_url_returns_first_page_url(self, crawler):
-        """get_page_url(1)은 첫 페이지 URL을 반환해야 함"""
-        url = crawler.get_page_url(1)
-        assert url == "https://www.fmkorea.com/index.php?mid=hotdeal&page=1"
-
-    def test_get_page_url_returns_correct_page_url(self, crawler):
-        """get_page_url(N)은 해당 페이지 URL을 반환해야 함"""
-        assert crawler.get_page_url(2) == "https://www.fmkorea.com/index.php?mid=hotdeal&page=2"
-        assert crawler.get_page_url(5) == "https://www.fmkorea.com/index.php?mid=hotdeal&page=5"
-
-    def test_url_property_still_returns_base_url(self, crawler):
-        """url 속성은 기본 URL을 반환해야 함 (하위 호환성)"""
-        assert crawler.url == "https://www.fmkorea.com/hotdeal"
-
-    def test_custom_max_pages(self):
-        """max_pages를 커스텀 값으로 설정할 수 있어야 함"""
-        from app.src.Infrastructure.crawling.crawlers.fmkorea import FmkoreaCrawler
-
-        mock_client = MagicMock()
-        crawler = FmkoreaCrawler(keyword="테스트", client=mock_client, max_pages=5)
-
-        assert crawler.max_pages == 5
-
-
-class TestFmkoreaCrawlerFetchparse:
-    """FmkoreaCrawler.fetchparse() 다중 페이지 테스트"""
-
-    @pytest.fixture
-    def sample_html_page1(self):
-        """페이지 1 샘플 HTML (아이폰 포함)"""
-        return """
-        <div class="fm_best_widget">
-            <div class="li">
-                <div class="title">
-                    <a href="/1001">[11번가] 아이폰 15 프로</a>
-                </div>
-                <div class="hotdeal_info">
-                    <span>쇼핑몰: <a href="#">11번가</a></span>
-                    <span>가격: <a href="#">1,190,000원</a></span>
-                </div>
-            </div>
-        </div>
-        """
-
-    @pytest.fixture
-    def sample_html_page2(self):
-        """페이지 2 샘플 HTML (아이폰 포함)"""
-        return """
-        <div class="fm_best_widget">
-            <div class="li">
-                <div class="title">
-                    <a href="/2001">[쿠팡] 아이폰 14 할인</a>
-                </div>
-                <div class="hotdeal_info">
-                    <span>쇼핑몰: <a href="#">쿠팡</a></span>
-                    <span>가격: <a href="#">990,000원</a></span>
-                </div>
-            </div>
-        </div>
-        """
-
-    @pytest.fixture
-    def sample_html_no_keyword(self):
-        """키워드 없는 페이지 샘플 HTML"""
-        return """
-        <div class="fm_best_widget">
-            <div class="li">
-                <div class="title">
-                    <a href="/3001">[네이버] 갤럭시 S24</a>
-                </div>
-                <div class="hotdeal_info">
-                    <span>쇼핑몰: <a href="#">네이버</a></span>
-                </div>
-            </div>
-        </div>
-        """
-
-    @pytest.mark.asyncio
-    async def test_fetchparse_fetches_multiple_pages(
-        self, sample_html_page1, sample_html_page2
-    ):
-        """fetchparse()는 max_pages만큼 페이지를 가져와야 함"""
-        from app.src.Infrastructure.crawling.crawlers.fmkorea import FmkoreaCrawler
-
-        mock_client = MagicMock()
-        crawler = FmkoreaCrawler(keyword="아이폰", client=mock_client, max_pages=2)
-
-        # fetch 메서드를 mock하여 페이지별로 다른 HTML 반환
-        call_count = 0
-
-        async def mock_fetch(url, timeout=10):
-            nonlocal call_count
-            call_count += 1
-            if "page=1" in url:
-                return sample_html_page1
-            elif "page=2" in url:
-                return sample_html_page2
-            return None
-
-        with patch.object(crawler, "fetch", side_effect=mock_fetch):
-            results = await crawler.fetchparse()
-
-        # 2개 페이지에서 각각 1개씩, 총 2개 결과
-        assert len(results) == 2
-        assert call_count == 2
-
-    @pytest.mark.asyncio
-    async def test_fetchparse_deduplicates_results(self, sample_html_page1):
-        """fetchparse()는 중복 ID를 제거해야 함"""
-        from app.src.Infrastructure.crawling.crawlers.fmkorea import FmkoreaCrawler
-
-        mock_client = MagicMock()
-        crawler = FmkoreaCrawler(keyword="아이폰", client=mock_client, max_pages=2)
-
-        # 두 페이지 모두 같은 ID 반환
-        async def mock_fetch(url, timeout=10):
-            return sample_html_page1
-
-        with patch.object(crawler, "fetch", side_effect=mock_fetch):
-            results = await crawler.fetchparse()
-
-        # 중복 제거되어 1개만 반환
-        assert len(results) == 1
-        assert results[0].id == "1001"
-
-    @pytest.mark.asyncio
-    async def test_fetchparse_continues_on_page_failure(
-        self, sample_html_page1, sample_html_page2
-    ):
-        """fetchparse()는 한 페이지가 실패해도 계속 진행해야 함"""
-        from app.src.Infrastructure.crawling.crawlers.fmkorea import FmkoreaCrawler
-
-        mock_client = MagicMock()
-        crawler = FmkoreaCrawler(keyword="아이폰", client=mock_client, max_pages=3)
-
-        # 페이지 2는 실패
-        async def mock_fetch(url, timeout=10):
-            if "page=1" in url:
-                return sample_html_page1
-            elif "page=2" in url:
-                return None  # 실패
-            elif "page=3" in url:
-                return sample_html_page2
-            return None
-
-        with patch.object(crawler, "fetch", side_effect=mock_fetch):
-            results = await crawler.fetchparse()
-
-        # 페이지 1과 3에서 결과 수집
-        assert len(results) == 2
-
-    @pytest.mark.asyncio
-    async def test_fetchparse_returns_empty_when_no_matches(
-        self, sample_html_no_keyword
-    ):
-        """fetchparse()는 매칭되는 키워드가 없으면 빈 리스트를 반환해야 함"""
-        from app.src.Infrastructure.crawling.crawlers.fmkorea import FmkoreaCrawler
-
-        mock_client = MagicMock()
-        crawler = FmkoreaCrawler(keyword="아이폰", client=mock_client, max_pages=2)
-
-        async def mock_fetch(url, timeout=10):
-            return sample_html_no_keyword
-
-        with patch.object(crawler, "fetch", side_effect=mock_fetch):
-            results = await crawler.fetchparse()
-
-        assert results == []
 
 
 class TestFmkoreaRegistry:

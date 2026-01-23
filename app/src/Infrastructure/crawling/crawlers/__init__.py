@@ -20,7 +20,7 @@ SITE_METADATA: dict[SiteName, dict[str, str]] = {
     },
     SiteName.FMKOREA: {
         "display_name": "FM코리아",
-        "search_url_template": "https://www.fmkorea.com/search?keyword={keyword}",
+        "search_url_template": "https://www.fmkorea.com/search.php?mid=hotdeal&search_keyword={keyword}&search_target=title_content",
     },
     SiteName.RULIWEB: {
         "display_name": "루리웹",

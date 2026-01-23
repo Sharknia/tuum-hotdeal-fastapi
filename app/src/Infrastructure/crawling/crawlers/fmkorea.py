@@ -1,6 +1,6 @@
 import re
+from urllib.parse import parse_qs, quote, urlparse
 
-import httpx
 from bs4 import BeautifulSoup
 
 from app.src.core.logger import logger
@@ -12,22 +12,10 @@ from app.src.Infrastructure.crawling.base_crawler import BaseCrawler
 class FmkoreaCrawler(BaseCrawler):
     requires_browser = True
 
-    def __init__(
-        self,
-        keyword: str,
-        client: httpx.AsyncClient,
-        max_pages: int = 3,
-    ):
-        super().__init__(keyword=keyword, client=client)
-        self.max_pages = max_pages
-
     @property
     def url(self) -> str:
-        return "https://www.fmkorea.com/hotdeal"
-
-    def get_page_url(self, page: int) -> str:
-        """페이지 번호에 해당하는 URL을 반환합니다."""
-        return f"https://www.fmkorea.com/index.php?mid=hotdeal&page={page}"
+        encoded_keyword = quote(self.keyword)
+        return f"https://www.fmkorea.com/search.php?mid=hotdeal&search_keyword={encoded_keyword}&search_target=title_content"
 
     @property
     def site_name(self) -> SiteName:
@@ -35,34 +23,39 @@ class FmkoreaCrawler(BaseCrawler):
 
     def parse(self, html: str) -> list[CrawledKeyword]:
         soup = BeautifulSoup(html, "html.parser")
+
+        # 검색 결과 페이지에서 게시물 찾기
         items = soup.select(".fm_best_widget .li")
         if not items:
-            logger.warning("FM코리아 핫딜 위젯을 찾을 수 없습니다.")
+            logger.warning("FM코리아 검색 결과를 찾을 수 없습니다.")
             return []
 
         products = []
+        seen_ids: set[str] = set()
+
         for row in items:
-            # 종료된 핫딜 제외 (hotdeal_var8Y 클래스가 있으면 종료된 딜)
-            if row.select_one(".hotdeal_var8Y"):
+            # 종료된 핫딜 제외 (li에 hotdeal_var8Y 클래스가 있으면 종료된 딜)
+            row_classes = row.get("class", [])
+            if "hotdeal_var8Y" in row_classes:
                 continue
 
             title_tag = row.select_one(".title a")
             if not title_tag:
                 continue
 
-            # href에서 게시물 ID 추출 (예: "/7953041" -> "7953041")
             href = title_tag.get("href", "")
-            post_id = href.lstrip("/")
-            if not post_id.isdigit():
+            post_id = self._extract_post_id(href)
+            if not post_id:
                 continue
+
+            # 중복 제거 (검색 결과에서 같은 게시물이 여러 번 나올 수 있음)
+            if post_id in seen_ids:
+                continue
+            seen_ids.add(post_id)
 
             # 제목 추출 (get_text 사용, 댓글 수 [N]은 정규식으로 제거)
             title = title_tag.get_text(strip=True)
             title = re.sub(r"\[\d+\]$", "", title).strip()
-
-            # 키워드 필터링 (대소문자 무시)
-            if self.keyword.lower() not in title.lower():
-                continue
 
             # 가격 추출 (hotdeal_info에서)
             price = self._extract_price(row)
@@ -81,6 +74,34 @@ class FmkoreaCrawler(BaseCrawler):
                     search_url=self.search_url,
                 )
             )
+
+        return products
+
+    def _extract_post_id(self, href: str) -> str | None:
+        """href에서 게시물 ID를 추출합니다.
+
+        두 가지 형식 지원:
+        1. 일반 페이지: "/7953041" -> "7953041"
+        2. 검색 결과: "/index.php?...&document_srl=9414104419&..." -> "9414104419"
+        """
+        if not href:
+            return None
+
+        # 검색 결과 페이지 형식 (document_srl 파라미터)
+        if "document_srl=" in href:
+            parsed = urlparse(href)
+            params = parse_qs(parsed.query)
+            doc_srl = params.get("document_srl", [None])[0]
+            if doc_srl and doc_srl.isdigit():
+                return doc_srl
+            return None
+
+        # 일반 페이지 형식 (/숫자)
+        post_id = href.lstrip("/")
+        if post_id.isdigit():
+            return post_id
+
+        return None
 
         return products
 
@@ -116,30 +137,3 @@ class FmkoreaCrawler(BaseCrawler):
                     meta_parts.append(f"배송: {delivery_link.get_text(strip=True)}")
 
         return " | ".join(meta_parts)
-
-    async def fetchparse(self) -> list[CrawledKeyword]:
-        """여러 페이지를 크롤링하여 결과를 합칩니다."""
-        all_results: list[CrawledKeyword] = []
-        seen_ids: set[str] = set()
-
-        for page in range(1, self.max_pages + 1):
-            page_url = self.get_page_url(page)
-            html = await self.fetch(page_url)
-
-            if not html:
-                logger.warning(f"[{self.keyword}] 페이지 {page} 크롤링 실패: {page_url}")
-                continue
-
-            page_results = self.parse(html)
-            logger.info(
-                f"[{self.keyword}] 페이지 {page}/{self.max_pages}: {len(page_results)}개 발견"
-            )
-
-            # 중복 제거
-            for result in page_results:
-                if result.id not in seen_ids:
-                    seen_ids.add(result.id)
-                    all_results.append(result)
-
-        self.results = all_results
-        return self.results
