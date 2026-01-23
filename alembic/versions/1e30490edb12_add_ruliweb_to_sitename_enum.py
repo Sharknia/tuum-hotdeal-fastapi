@@ -1,4 +1,4 @@
-"""add_ruliweb_to_sitename_enum
+"""add_ruliweb_fmkorea_to_sitename_enum
 
 Revision ID: 1e30490edb12
 Revises: c616424fda8c
@@ -19,6 +19,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     op.execute("ALTER TYPE sitename ADD VALUE IF NOT EXISTS 'RULIWEB'")
+    op.execute("ALTER TYPE sitename ADD VALUE IF NOT EXISTS 'FMKOREA'")
 
 
 def downgrade() -> None:
