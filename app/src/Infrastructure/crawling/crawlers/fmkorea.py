@@ -1,3 +1,5 @@
+import re
+
 from bs4 import BeautifulSoup
 
 from app.src.core.logger import logger
@@ -7,11 +9,7 @@ from app.src.Infrastructure.crawling.base_crawler import BaseCrawler
 
 
 class FmkoreaCrawler(BaseCrawler):
-    """FM코리아 핫딜 게시판 크롤러.
-
-    FM코리아는 XE CMS 기반으로, 핫딜 게시판의 게시물을 크롤링합니다.
-    검색 URL을 사용하지 않고 전체 핫딜 목록에서 키워드로 필터링합니다.
-    """
+    requires_browser = True
 
     @property
     def url(self) -> str:
@@ -23,13 +21,13 @@ class FmkoreaCrawler(BaseCrawler):
 
     def parse(self, html: str) -> list[CrawledKeyword]:
         soup = BeautifulSoup(html, "html.parser")
-        container = soup.select_one("#content .fm_best_widget ul")
-        if not container:
+        items = soup.select(".fm_best_widget .li")
+        if not items:
             logger.warning("FM코리아 핫딜 위젯을 찾을 수 없습니다.")
             return []
 
         products = []
-        for row in container.find_all("li"):
+        for row in items:
             # 종료된 핫딜 제외 (hotdeal_var8Y 클래스가 있으면 종료된 딜)
             if row.select_one(".hotdeal_var8Y"):
                 continue
@@ -44,13 +42,9 @@ class FmkoreaCrawler(BaseCrawler):
             if not post_id.isdigit():
                 continue
 
-            # 제목 추출 (댓글 수 span 제외)
-            title_text = title_tag.find(string=True, recursive=False)
-            if not title_text:
-                # fallback: 전체 텍스트 사용
-                title = title_tag.get_text(strip=True)
-            else:
-                title = title_text.strip()
+            # 제목 추출 (get_text 사용, 댓글 수 [N]은 정규식으로 제거)
+            title = title_tag.get_text(strip=True)
+            title = re.sub(r"\[\d+\]$", "", title).strip()
 
             # 키워드 필터링 (대소문자 무시)
             if self.keyword.lower() not in title.lower():

@@ -18,6 +18,15 @@ class TestSiteNameFmkorea:
 class TestFmkoreaCrawlerProperties:
     """FmkoreaCrawler 속성 테스트"""
 
+    def test_requires_browser_is_true(self):
+        """FmkoreaCrawler는 requires_browser=True여야 함"""
+        from app.src.Infrastructure.crawling.crawlers.fmkorea import FmkoreaCrawler
+
+        mock_client = MagicMock()
+        crawler = FmkoreaCrawler(keyword="테스트", client=mock_client)
+
+        assert crawler.requires_browser is True
+
     def test_url_property(self):
         """url 속성이 올바른 핫딜 게시판 URL을 반환해야 함"""
         from app.src.Infrastructure.crawling.crawlers.fmkorea import FmkoreaCrawler
@@ -37,7 +46,7 @@ class TestFmkoreaCrawlerProperties:
         assert crawler.site_name == SiteName.FMKOREA
 
     def test_search_url_property(self):
-        """search_url 속성이 url과 동일해야 함 (FM코리아는 검색 URL이 따로 없음)"""
+        """search_url 속성이 url과 동일해야 함"""
         from app.src.Infrastructure.crawling.crawlers.fmkorea import FmkoreaCrawler
 
         mock_client = MagicMock()
@@ -51,56 +60,36 @@ class TestFmkoreaCrawlerParse:
 
     @pytest.fixture
     def sample_html(self):
-        """FM코리아 핫딜 게시판 샘플 HTML"""
+        """FM코리아 핫딜 게시판 샘플 HTML (실제 구조: div.li)"""
         return """
-        <div id="content">
-            <div class="fm_best_widget">
-                <ul>
-                    <li>
-                        <div class="title">
-                            <a href="/7953041">[11번가] 아이폰 15 프로 자급제 1,190,000원</a>
-                        </div>
-                        <div class="category">
-                            <a href="#">디지털</a>
-                        </div>
-                        <div class="author">/ 핫딜러123</div>
-                        <span class="pc_voted_count">
-                            <span class="count">42</span>
-                        </span>
-                        <span class="comment_count">[15]</span>
-                        <div class="hotdeal_info">
-                            <span>쇼핑몰: <a href="#">11번가</a></span>
-                            <span>가격: <a href="#">1,190,000원</a></span>
-                            <span>배송: <a href="#">무료배송</a></span>
-                        </div>
-                    </li>
-                    <li>
-                        <div class="title">
-                            <a href="/7952999">[쿠팡] 맥북 에어 M3 15인치 1,490,000원</a>
-                        </div>
-                        <div class="category">
-                            <a href="#">디지털</a>
-                        </div>
-                        <div class="author">/ 딜마스터</div>
-                        <div class="hotdeal_info">
-                            <span>쇼핑몰: <a href="#">쿠팡</a></span>
-                            <span>가격: <a href="#">1,490,000원</a></span>
-                        </div>
-                    </li>
-                    <li class="hotdeal_var8Y">
-                        <div class="title">
-                            <a href="/7950000">[종료] 에어팟 프로 2 품절</a>
-                        </div>
-                        <div class="category">
-                            <a href="#">디지털</a>
-                        </div>
-                        <div class="author">/ 테스터</div>
-                        <div class="hotdeal_info">
-                            <span>쇼핑몰: <a href="#">네이버</a></span>
-                            <span>가격: <a href="#">299,000원</a></span>
-                        </div>
-                    </li>
-                </ul>
+        <div class="fm_best_widget">
+            <div class="li">
+                <div class="title">
+                    <a href="/7953041">[11번가] 아이폰 15 프로 자급제 1,190,000원</a>
+                </div>
+                <div class="hotdeal_info">
+                    <span>쇼핑몰: <a href="#">11번가</a></span>
+                    <span>가격: <a href="#">1,190,000원</a></span>
+                    <span>배송: <a href="#">무료배송</a></span>
+                </div>
+            </div>
+            <div class="li">
+                <div class="title">
+                    <a href="/7952999">[쿠팡] 맥북 에어 M3 15인치 1,490,000원</a>
+                </div>
+                <div class="hotdeal_info">
+                    <span>쇼핑몰: <a href="#">쿠팡</a></span>
+                    <span>가격: <a href="#">1,490,000원</a></span>
+                </div>
+            </div>
+            <div class="li hotdeal_var8Y">
+                <div class="title">
+                    <a href="/7950000">[종료] 에어팟 프로 2 품절</a>
+                </div>
+                <div class="hotdeal_info">
+                    <span>쇼핑몰: <a href="#">네이버</a></span>
+                    <span>가격: <a href="#">299,000원</a></span>
+                </div>
             </div>
         </div>
         """
@@ -109,36 +98,24 @@ class TestFmkoreaCrawlerParse:
     def sample_html_with_keyword(self):
         """키워드(아이폰)가 포함된 샘플 HTML"""
         return """
-        <div id="content">
-            <div class="fm_best_widget">
-                <ul>
-                    <li>
-                        <div class="title">
-                            <a href="/7953041">[11번가] 아이폰 15 프로 자급제 1,190,000원</a>
-                        </div>
-                        <div class="category">
-                            <a href="#">디지털</a>
-                        </div>
-                        <div class="author">/ 핫딜러123</div>
-                        <div class="hotdeal_info">
-                            <span>쇼핑몰: <a href="#">11번가</a></span>
-                            <span>가격: <a href="#">1,190,000원</a></span>
-                        </div>
-                    </li>
-                    <li>
-                        <div class="title">
-                            <a href="/7952888">[쿠팡] 갤럭시 S24 울트라 할인</a>
-                        </div>
-                        <div class="category">
-                            <a href="#">디지털</a>
-                        </div>
-                        <div class="author">/ 딜러</div>
-                        <div class="hotdeal_info">
-                            <span>쇼핑몰: <a href="#">쿠팡</a></span>
-                            <span>가격: <a href="#">1,299,000원</a></span>
-                        </div>
-                    </li>
-                </ul>
+        <div class="fm_best_widget">
+            <div class="li">
+                <div class="title">
+                    <a href="/7953041">[11번가] 아이폰 15 프로 자급제 1,190,000원</a>
+                </div>
+                <div class="hotdeal_info">
+                    <span>쇼핑몰: <a href="#">11번가</a></span>
+                    <span>가격: <a href="#">1,190,000원</a></span>
+                </div>
+            </div>
+            <div class="li">
+                <div class="title">
+                    <a href="/7952888">[쿠팡] 갤럭시 S24 울트라 할인</a>
+                </div>
+                <div class="hotdeal_info">
+                    <span>쇼핑몰: <a href="#">쿠팡</a></span>
+                    <span>가격: <a href="#">1,299,000원</a></span>
+                </div>
             </div>
         </div>
         """
@@ -162,7 +139,6 @@ class TestFmkoreaCrawlerParse:
         """parse()는 키워드가 포함된 게시물만 반환해야 함"""
         result = crawler.parse(sample_html_with_keyword)
 
-        # "아이폰" 키워드가 포함된 게시물만 반환
         assert len(result) == 1
         assert "아이폰" in result[0].title
 
@@ -207,7 +183,7 @@ class TestFmkoreaCrawlerParse:
         result = crawler.parse(sample_html)
 
         ids = [item.id for item in result]
-        assert "7950000" not in ids  # 종료된 딜 ID
+        assert "7950000" not in ids
 
     def test_parse_returns_empty_list_when_no_content(self, crawler):
         """콘텐츠가 없으면 빈 리스트를 반환해야 함"""
@@ -218,20 +194,14 @@ class TestFmkoreaCrawlerParse:
     def test_parse_returns_empty_when_keyword_not_found(self, crawler):
         """키워드가 없는 게시물만 있으면 빈 리스트를 반환해야 함"""
         html = """
-        <div id="content">
-            <div class="fm_best_widget">
-                <ul>
-                    <li>
-                        <div class="title">
-                            <a href="/123456">[쿠팡] 갤럭시 S24 할인</a>
-                        </div>
-                        <div class="category"><a href="#">디지털</a></div>
-                        <div class="author">/ 테스터</div>
-                        <div class="hotdeal_info">
-                            <span>쇼핑몰: <a href="#">쿠팡</a></span>
-                        </div>
-                    </li>
-                </ul>
+        <div class="fm_best_widget">
+            <div class="li">
+                <div class="title">
+                    <a href="/123456">[쿠팡] 갤럭시 S24 할인</a>
+                </div>
+                <div class="hotdeal_info">
+                    <span>쇼핑몰: <a href="#">쿠팡</a></span>
+                </div>
             </div>
         </div>
         """
