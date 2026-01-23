@@ -37,9 +37,7 @@ class KeywordSite(Base):
     keyword_id = Column(
         Integer, ForeignKey("hotdeal_keywords.id"), primary_key=True, nullable=False
     )
-    site_name = Column(
-        Enum(SiteName), primary_key=True, nullable=False, default=SiteName.ALGUMON
-    )
+    site_name = Column(Enum(SiteName), primary_key=True, nullable=False)
     external_id = Column(String, nullable=False)
     link = Column(String, nullable=True)
     price = Column(String, nullable=True)

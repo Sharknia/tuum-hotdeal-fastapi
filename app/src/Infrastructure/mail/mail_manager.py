@@ -1,4 +1,6 @@
 from email.mime.text import MIMEText
+from html import escape
+from itertools import groupby
 
 import aiosmtplib
 
@@ -13,18 +15,31 @@ async def make_hotdeal_email_content(
     updates: list[CrawledKeyword],
 ) -> str:
     """
-    핫딜 업데이트 내용을 메일 형식으로 변환
+    핫딜 업데이트 내용을 메일 형식으로 변환.
+    사이트별로 그룹화하여 표시합니다.
     """
-    search_url = f"https://www.algumon.com/search/{keyword.title}"
-    text = f"<h2><a href='{search_url}'>{keyword.title} 검색 결과</a></h2>"
-    product_list_html = "".join(
-        [
-            f"<p><a href='{product.link}'>{product.title}</a> - {product.price}</p>"
-            for product in updates
-        ]
-    )
-    text += product_list_html
-    return text
+    if not updates:
+        return ""
+
+    # 사이트별로 정렬 후 그룹화
+    sorted_updates = sorted(updates, key=lambda x: x.site_name.value)
+
+    html = f"<h2>{escape(keyword.title)} 새 핫딜</h2>"
+
+    for site_name, products in groupby(sorted_updates, key=lambda x: x.site_name):
+        products_list = list(products)
+        search_url = products_list[0].search_url
+        site_display = site_name.value.upper()
+
+        html += f"<h3><a href='{escape(search_url)}'>[{site_display}] 검색 결과</a></h3>"
+        html += "".join(
+            [
+                f"<p><a href='{escape(product.link)}'>{escape(product.title)}</a> - {escape(product.price or '')}</p>"
+                for product in products_list
+            ]
+        )
+
+    return html
 
 
 async def send_email(

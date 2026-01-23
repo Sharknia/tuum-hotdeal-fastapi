@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 import httpx
 
 from app.src.core.logger import logger
+from app.src.domain.hotdeal.enums import SiteName
 from app.src.domain.hotdeal.schemas import CrawledKeyword
 from app.src.Infrastructure.crawling.proxy_manager import ProxyManager
 
@@ -27,6 +28,17 @@ class BaseCrawler(ABC):
     ) -> str:
         """크롤링 대상 URL (하위 클래스에서 구현 필수)."""
         pass
+
+    @property
+    @abstractmethod
+    def site_name(self) -> SiteName:
+        """크롤러가 담당하는 사이트 (하위 클래스에서 구현 필수)."""
+        pass
+
+    @property
+    def search_url(self) -> str:
+        """검색 결과 페이지 URL (기본값: self.url)."""
+        return self.url
 
     @abstractmethod
     def parse(

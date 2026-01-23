@@ -1,21 +1,21 @@
 from bs4 import BeautifulSoup
 
 from app.src.core.logger import logger
+from app.src.domain.hotdeal.enums import SiteName
 from app.src.domain.hotdeal.schemas import CrawledKeyword
 from app.src.Infrastructure.crawling.base_crawler import BaseCrawler
 
 
 class AlgumonCrawler(BaseCrawler):
     @property
-    def url(
-        self,
-    ) -> str:
+    def url(self) -> str:
         return f"https://www.algumon.com/search/{self.keyword}"
 
-    def parse(
-        self,
-        html: str,
-    ) -> list[CrawledKeyword]:
+    @property
+    def site_name(self) -> SiteName:
+        return SiteName.ALGUMON
+
+    def parse(self, html: str) -> list[CrawledKeyword]:
         soup = BeautifulSoup(html, "html.parser")
         product_list = soup.find("ul", class_="product post-list")
         if not product_list:
@@ -41,6 +41,8 @@ class AlgumonCrawler(BaseCrawler):
                         .replace("\n", "")
                         .replace("\r", "")
                         .replace(" ", ""),
+                        site_name=self.site_name,
+                        search_url=self.search_url,
                     )
                 )
         return products

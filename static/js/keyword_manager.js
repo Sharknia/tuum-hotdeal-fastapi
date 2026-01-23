@@ -1,6 +1,14 @@
 const keywordListElement = document.getElementById('hotdeal-keyword-list');
 const keywordInputElement = document.getElementById('hotdeal-keyword-input');
 
+// 검색 링크 설정
+// NOTE: 현재 API는 키워드별 사이트 정보를 반환하지 않으므로 대표 사이트(알구몬)를 사용
+// 향후 멀티사이트 지원 시 API 확장 후 사이트별 링크 생성 가능
+const DEFAULT_SEARCH_SITE = {
+    name: '알구몬',
+    searchUrl: (keyword) => `https://www.algumon.com/search/${encodeURIComponent(keyword)}`,
+};
+
 // UI 업데이트 함수
 function renderKeywords(keywords) {
     keywordListElement.innerHTML = ''; // 기존 목록 초기화
@@ -14,9 +22,7 @@ function renderKeywords(keywords) {
         listItem.innerHTML = `
             <span class="keyword-title">${keyword.title}</span>
             <div class="keyword-actions">
-                <a href="https://www.algumon.com/search/${encodeURIComponent(
-                    keyword.title
-                )}" target="_blank" class="search-link-button" title="알구몬에서 검색하기">
+                <a href="${DEFAULT_SEARCH_SITE.searchUrl(keyword.title)}" target="_blank" class="search-link-button" title="${DEFAULT_SEARCH_SITE.name}에서 검색하기">
                     전체 목록 보기
                 </a>
                 <button class="delete-button" title="키워드 삭제">삭제</button>
