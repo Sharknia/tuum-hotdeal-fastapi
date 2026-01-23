@@ -65,14 +65,14 @@ app.add_middleware(
 
 
 # Custom OpenAPI 설정
-def custom_openapi():
-    if app.openapi_schema:
-        return app.openapi_schema
+def custom_openapi() -> dict:
+    if getattr(app, "openapi_schema", None):
+        return app.openapi_schema  # type: ignore[return-value]
     openapi_schema = get_openapi(
         title="Your API Title",
         version="1.0.0",
         description="This is a custom OpenAPI schema",
-        routes=app.routes,
+        routes=app.routes,  # type: ignore[arg-type]
     )
     openapi_schema["components"]["securitySchemes"] = {
         "BearerAuth": {
@@ -82,11 +82,11 @@ def custom_openapi():
         }
     }
     openapi_schema["security"] = [{"BearerAuth": []}]
-    app.openapi_schema = openapi_schema
-    return app.openapi_schema
+    app.openapi_schema = openapi_schema  # type: ignore[attr-defined]
+    return app.openapi_schema  # type: ignore[return-value]
 
 
-app.openapi = custom_openapi
+app.openapi = custom_openapi  # type: ignore[method-assign]
 
 app.include_router(user_router.router, prefix="/api/user")
 app.include_router(hotdeal_router.router, prefix="/api/hotdeal")
