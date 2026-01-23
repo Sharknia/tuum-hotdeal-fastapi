@@ -14,22 +14,47 @@ from app.worker_main import get_new_hotdeal_keywords, job
 
 CRAWLED_DATA_NEW = [
     CrawledKeyword(
-        id="101", title="[새상품] 키보드", link="new_link1", price="10000원"
+        id="101",
+        title="[새상품] 키보드",
+        link="new_link1",
+        price="10000원",
+        site_name=SiteName.ALGUMON,
+        search_url="https://www.algumon.com/search/테스트키워드",
     ),
     CrawledKeyword(
-        id="102", title="[새상품] 마우스", link="new_link2", price="20000원"
+        id="102",
+        title="[새상품] 마우스",
+        link="new_link2",
+        price="20000원",
+        site_name=SiteName.ALGUMON,
+        search_url="https://www.algumon.com/search/테스트키워드",
     ),
     CrawledKeyword(
-        id="103", title="[기존상품] 모니터", link="old_link3", price="30000원"
+        id="103",
+        title="[기존상품] 모니터",
+        link="old_link3",
+        price="30000원",
+        site_name=SiteName.ALGUMON,
+        search_url="https://www.algumon.com/search/테스트키워드",
     ),
 ]
 
 CRAWLED_DATA_NO_NEW = [
     CrawledKeyword(
-        id="103", title="[기존상품] 모니터", link="old_link3", price="30000원"
+        id="103",
+        title="[기존상품] 모니터",
+        link="old_link3",
+        price="30000원",
+        site_name=SiteName.ALGUMON,
+        search_url="https://www.algumon.com/search/테스트키워드",
     ),
     CrawledKeyword(
-        id="104", title="[기존상품] 스피커", link="old_link4", price="40000원"
+        id="104",
+        title="[기존상품] 스피커",
+        link="old_link4",
+        price="40000원",
+        site_name=SiteName.ALGUMON,
+        search_url="https://www.algumon.com/search/테스트키워드",
     ),
 ]
 
