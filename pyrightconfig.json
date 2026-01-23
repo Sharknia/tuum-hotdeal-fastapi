@@ -1,0 +1,18 @@
+{
+  "venvPath": "/home/ubuntu/.cache/pypoetry/virtualenvs",
+  "venv": "tuum-hotdeal-fastapi-orcX6HTN-py3.12",
+  "pythonVersion": "3.12",
+  "include": ["app", "tests"],
+  "exclude": ["**/node_modules", "**/__pycache__", ".git", "alembic"],
+  "reportMissingImports": true,
+  "reportMissingTypeStubs": false,
+  "typeCheckingMode": "off",
+  "reportArgumentType": false,
+  "reportAssignmentType": false,
+  "reportAttributeAccessIssue": false,
+  "reportReturnType": false,
+  "reportGeneralTypeIssues": false,
+  "reportOptionalMemberAccess": false,
+  "reportCallIssue": false,
+  "reportRedeclaration": false
+}
