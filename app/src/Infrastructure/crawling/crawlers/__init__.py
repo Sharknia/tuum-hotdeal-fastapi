@@ -3,9 +3,11 @@ import httpx
 from app.src.domain.hotdeal.enums import SiteName
 from app.src.Infrastructure.crawling.base_crawler import BaseCrawler
 from app.src.Infrastructure.crawling.crawlers.algumon import AlgumonCrawler
+from app.src.Infrastructure.crawling.crawlers.ruliweb import RuliwebCrawler
 
 CRAWLER_REGISTRY: dict[SiteName, type[BaseCrawler]] = {
     SiteName.ALGUMON: AlgumonCrawler,
+    SiteName.RULIWEB: RuliwebCrawler,
 }
 
 
