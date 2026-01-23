@@ -71,13 +71,13 @@
                         nicknameEl.textContent = userInfo.nickname;
                     }
 
-                    document.getElementById('add-hotdeal-keyword-form').addEventListener('submit', async (event) => {
+                    document.getElementById('add-hotdeal-keyword-form')?.addEventListener('submit', async (event) => {
                         event.preventDefault();
                         const input = document.getElementById('hotdeal-keyword-input');
                         await addKeyword(input.value);
                     });
 
-                    document.getElementById('hotdeal-keyword-list').addEventListener('click', async (event) => {
+                    document.getElementById('hotdeal-keyword-list')?.addEventListener('click', async (event) => {
                         if (event.target.closest('.delete-button')) {
                             const listItem = event.target.closest('li');
                             const keywordId = listItem.dataset.id;
