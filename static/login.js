@@ -26,8 +26,8 @@ async function handleLogin(event) {
 
         // 토큰 저장
         saveTokens(data.access_token, data.user_id, rememberMe);
-        // 홈 페이지로 이동
-        window.location.href = '/home';
+        // 핫딜 페이지로 직접 이동 (중간 페이지 깜빡임 방지)
+        window.location.href = '/hotdeal';
     } catch (error) {
         alert(error.message);
         console.error('로그인 에러:', error);
