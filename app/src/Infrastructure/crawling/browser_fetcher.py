@@ -1,5 +1,4 @@
 import re
-from contextlib import asynccontextmanager
 from typing import ClassVar, Self
 
 from playwright.async_api import async_playwright

@@ -1,7 +1,5 @@
 from unittest.mock import MagicMock
 
-import pytest
-
 from app.src.domain.hotdeal.enums import SiteName
 from app.src.Infrastructure.crawling.crawlers import (
     CRAWLER_REGISTRY,
