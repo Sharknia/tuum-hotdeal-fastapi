@@ -8,7 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.src.domain.hotdeal.enums import SiteName
 from app.src.domain.hotdeal.models import Keyword, KeywordSite
 from app.src.domain.hotdeal.schemas import CrawledKeyword
-from app.worker_main import get_new_hotdeal_keywords, job
+from app.worker_main import (
+    get_new_hotdeal_keywords,
+    get_new_hotdeal_keywords_for_site,
+    handle_keyword,
+    job,
+)
 
 # --- 테스트 데이터 ---
 
@@ -102,10 +107,10 @@ async def test_get_new_hotdeal_keywords_first_crawl(
     - 기대: 첫 크롤링 시 스팸 방지를 위해 최신 1개만 반환되고, DB에 저장되어야 함
     """
     # GIVEN: 크롤러가 CRAWLED_DATA_NEW를 반환하도록 모킹
-    with patch(
-        "app.worker_main.AlgumonCrawler.fetchparse", new_callable=AsyncMock
-    ) as mock_fetch:
-        mock_fetch.return_value = CRAWLED_DATA_NEW
+    mock_crawler = AsyncMock()
+    mock_crawler.fetchparse.return_value = CRAWLED_DATA_NEW
+
+    with patch("app.worker_main.get_crawler", return_value=mock_crawler):
         async with httpx.AsyncClient() as client:
             # WHEN: 새로운 핫딜을 조회
             new_deals = await get_new_hotdeal_keywords(
@@ -135,10 +140,10 @@ async def test_get_new_hotdeal_keywords_no_new_deals(
     """
     # GIVEN: 크롤러가 이전에 저장된 핫딜과 동일한 목록을 반환하도록 모킹
     keyword, _ = keyword_and_site_in_db
-    with patch(
-        "app.worker_main.AlgumonCrawler.fetchparse", new_callable=AsyncMock
-    ) as mock_fetch:
-        mock_fetch.return_value = CRAWLED_DATA_NO_NEW
+    mock_crawler = AsyncMock()
+    mock_crawler.fetchparse.return_value = CRAWLED_DATA_NO_NEW
+
+    with patch("app.worker_main.get_crawler", return_value=mock_crawler):
         async with httpx.AsyncClient() as client:
             # WHEN: 새로운 핫딜을 조회
             new_deals = await get_new_hotdeal_keywords(mock_db_session, keyword, client)
@@ -157,10 +162,10 @@ async def test_get_new_hotdeal_keywords_with_new_deals(
     """
     # GIVEN: 크롤러가 새로운 핫딜이 포함된 목록을 반환하도록 모킹
     keyword, old_site_data = keyword_and_site_in_db
-    with patch(
-        "app.worker_main.AlgumonCrawler.fetchparse", new_callable=AsyncMock
-    ) as mock_fetch:
-        mock_fetch.return_value = CRAWLED_DATA_NEW
+    mock_crawler = AsyncMock()
+    mock_crawler.fetchparse.return_value = CRAWLED_DATA_NEW
+
+    with patch("app.worker_main.get_crawler", return_value=mock_crawler):
         async with httpx.AsyncClient() as client:
             # WHEN: 새로운 핫딜을 조회
             new_deals = await get_new_hotdeal_keywords(mock_db_session, keyword, client)
@@ -194,7 +199,7 @@ async def test_job_e2e(mock_db_session, keyword_in_db):
     # GIVEN: 크롤링, 메일 발송, DB 조회 모킹
     with (
         patch(
-            "app.worker_main.get_new_hotdeal_keywords", new_callable=AsyncMock
+            "app.worker_main.get_new_hotdeal_keywords_for_site", new_callable=AsyncMock
         ) as mock_get_new,
         patch(
             "app.worker_main.send_email", new_callable=AsyncMock
@@ -214,3 +219,153 @@ async def test_job_e2e(mock_db_session, keyword_in_db):
         assert kwargs["to"] == "test@example.com"
         assert "테스트키워드" in kwargs["subject"]
         assert "[새상품] 키보드" in kwargs["body"]
+
+
+# --- Phase 3: 멀티사이트 지원 테스트 ---
+
+
+@pytest.mark.asyncio
+async def test_get_new_hotdeal_keywords_for_site_first_crawl(
+    mock_db_session: AsyncSession, keyword_in_db: Keyword
+):
+    """
+    시나리오: 특정 사이트에서 처음 크롤링
+    - 기대: 최신 1개만 반환, DB에 저장
+    """
+    # GIVEN: get_crawler가 모킹된 크롤러를 반환하도록 설정
+    mock_crawler = AsyncMock()
+    mock_crawler.fetchparse.return_value = CRAWLED_DATA_NEW
+
+    with patch("app.worker_main.get_crawler", return_value=mock_crawler):
+        async with httpx.AsyncClient() as client:
+            # WHEN: 특정 사이트에서 새로운 핫딜 조회
+            new_deals = await get_new_hotdeal_keywords_for_site(
+                mock_db_session, keyword_in_db, client, SiteName.ALGUMON
+            )
+
+            # THEN: 첫 크롤링이므로 최신 1개만 반환
+            assert len(new_deals) == 1
+            assert new_deals[0].id == "101"
+
+            # AND: DB에 저장 확인
+            stmt = select(KeywordSite).where(
+                KeywordSite.keyword_id == keyword_in_db.id,
+                KeywordSite.site_name == SiteName.ALGUMON,
+            )
+            result = await mock_db_session.execute(stmt)
+            saved_site = result.scalars().one()
+            assert saved_site.external_id == "101"
+
+
+@pytest.mark.asyncio
+async def test_get_new_hotdeal_keywords_for_site_with_new_deals(
+    mock_db_session: AsyncSession, keyword_and_site_in_db: tuple[Keyword, KeywordSite]
+):
+    """
+    시나리오: 특정 사이트에서 새로운 핫딜 발견
+    - 기대: 이전 핫딜 제외, 새 항목만 반환
+    """
+    keyword, old_site_data = keyword_and_site_in_db
+
+    mock_crawler = AsyncMock()
+    mock_crawler.fetchparse.return_value = CRAWLED_DATA_NEW
+
+    with patch("app.worker_main.get_crawler", return_value=mock_crawler):
+        async with httpx.AsyncClient() as client:
+            # WHEN: 새로운 핫딜 조회
+            new_deals = await get_new_hotdeal_keywords_for_site(
+                mock_db_session, keyword, client, SiteName.ALGUMON
+            )
+
+            # THEN: 새로운 핫딜 2개만 반환 (기존 103 제외)
+            assert len(new_deals) == 2
+            assert new_deals[0].id == "101"
+            assert new_deals[1].id == "102"
+
+            # AND: DB 업데이트 확인
+            await mock_db_session.refresh(old_site_data)
+            assert old_site_data.external_id == "101"
+
+
+@pytest.mark.asyncio
+async def test_handle_keyword_multisite_all_success(
+    mock_db_session: AsyncSession, keyword_in_db: Keyword
+):
+    """
+    시나리오: 모든 사이트에서 크롤링 성공
+    - 기대: 모든 사이트의 결과가 병합되어 반환
+    """
+    import asyncio
+
+    # GIVEN: 사이트별 세마포어 설정
+    site_semaphores = {SiteName.ALGUMON: asyncio.Semaphore(2)}
+
+    # GIVEN: get_new_hotdeal_keywords_for_site가 결과를 반환하도록 모킹
+    with (
+        patch("app.worker_main.get_active_sites", return_value=[SiteName.ALGUMON]),
+        patch(
+            "app.worker_main.get_new_hotdeal_keywords_for_site", new_callable=AsyncMock
+        ) as mock_get_for_site,
+        patch("app.worker_main.AsyncSessionLocal", return_value=mock_db_session),
+    ):
+        mock_get_for_site.return_value = CRAWLED_DATA_NEW[:2]
+
+        async with httpx.AsyncClient() as client:
+            # WHEN: handle_keyword 호출
+            result = await handle_keyword(keyword_in_db, client, site_semaphores)
+
+            # THEN: 결과가 반환되어야 함
+            assert result is not None
+            keyword, deals = result
+            assert keyword.title == "테스트키워드"
+            assert len(deals) == 2
+
+
+@pytest.mark.asyncio
+async def test_handle_keyword_multisite_partial_failure(
+    mock_db_session: AsyncSession, keyword_in_db: Keyword
+):
+    """
+    시나리오: 일부 사이트에서 크롤링 실패
+    - 기대: 성공한 사이트의 결과만 반환, 실패 로깅
+    """
+    import asyncio
+
+    # GIVEN: 가상의 두 사이트 설정 (ALGUMON + FMKOREA)
+    # 참고: FMKOREA가 enum에 없을 수 있으므로 ALGUMON만 사용하되, 테스트용으로 같은 사이트 2번 호출 시뮬레이션
+    site_semaphores = {SiteName.ALGUMON: asyncio.Semaphore(2)}
+
+    call_count = 0
+
+    async def mock_get_for_site_side_effect(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return CRAWLED_DATA_NEW[:1]  # 첫 번째 호출: 성공
+        else:
+            raise Exception("Crawling failed")  # 두 번째 호출: 실패
+
+    with (
+        patch(
+            "app.worker_main.get_active_sites",
+            return_value=[SiteName.ALGUMON, SiteName.ALGUMON],  # 테스트용 중복
+        ),
+        patch(
+            "app.worker_main.get_new_hotdeal_keywords_for_site", new_callable=AsyncMock
+        ) as mock_get_for_site,
+        patch("app.worker_main.AsyncSessionLocal", return_value=mock_db_session),
+        patch("app.worker_main.logger") as mock_logger,
+    ):
+        mock_get_for_site.side_effect = mock_get_for_site_side_effect
+
+        async with httpx.AsyncClient() as client:
+            # WHEN: handle_keyword 호출
+            result = await handle_keyword(keyword_in_db, client, site_semaphores)
+
+            # THEN: 성공한 사이트의 결과만 반환
+            assert result is not None
+            keyword, deals = result
+            assert len(deals) == 1
+
+            # AND: 실패 로깅 확인
+            mock_logger.error.assert_called()

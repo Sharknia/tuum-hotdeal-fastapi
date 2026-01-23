@@ -18,8 +18,7 @@ from app.src.domain.mail.models import MailLog
 from app.src.domain.user.models import User, user_keywords
 
 # 프로젝트의 공통 설정과 DB 세션을 가져옵니다
-from app.src.Infrastructure.crawling.base_crawler import BaseCrawler
-from app.src.Infrastructure.crawling.crawlers.algumon import AlgumonCrawler
+from app.src.Infrastructure.crawling.crawlers import get_active_sites, get_crawler
 from app.src.Infrastructure.crawling.proxy_manager import ProxyManager
 from app.src.Infrastructure.mail.mail_manager import (
     make_hotdeal_email_content,
@@ -59,40 +58,59 @@ PROXY_MANAGER = ProxyManager()
 async def handle_keyword(
     keyword: Keyword,
     client: httpx.AsyncClient,
+    site_semaphores: dict[SiteName, asyncio.Semaphore],
 ) -> tuple[Keyword, list[CrawledKeyword]] | None:
     """
-    단일 키워드를 크롤링하고, 신규 핫딜이 있는 경우 결과를 반환합니다.
+    단일 키워드를 모든 활성 사이트에서 크롤링하고, 신규 핫딜이 있는 경우 결과를 반환합니다.
     """
-    # 각 작업 사이에 랜덤한 지연을 주어 서버 부하를 분산
-    delay = random.uniform(1, 5)
-    await asyncio.sleep(delay)
-
     logger.info(f"[INFO] 키워드 처리: [{keyword.title}]")
 
-    async with AsyncSessionLocal() as session:
-        crawled_data: list[CrawledKeyword] = await get_new_hotdeal_keywords(
-            session=session,
-            keyword=keyword,
-            client=client,
-        )
+    # 활성 사이트 목록을 한 번만 조회 (일관성 보장)
+    active_sites = get_active_sites()
 
-    if crawled_data:
+    async def crawl_site(site: SiteName) -> list[CrawledKeyword]:
+        """특정 사이트에서 크롤링 수행 (세마포어로 동시성 제어)"""
+        async with site_semaphores[site]:
+            # 각 작업 사이에 랜덤한 지연을 주어 서버 부하를 분산
+            await asyncio.sleep(random.uniform(1, 3))
+            async with AsyncSessionLocal() as session:
+                return await get_new_hotdeal_keywords_for_site(
+                    session, keyword, client, site
+                )
+
+    # 모든 활성 사이트에서 병렬 크롤링
+    site_results = await asyncio.gather(
+        *[crawl_site(site) for site in active_sites],
+        return_exceptions=True,
+    )
+
+    # 결과 병합 + 실패 로깅
+    all_deals: list[CrawledKeyword] = []
+    for i, res in enumerate(site_results):
+        if isinstance(res, Exception):
+            site = active_sites[i]
+            logger.error(f"[{keyword.title}] {site.value} 크롤링 실패: {res}")
+        elif isinstance(res, list):
+            all_deals.extend(res)
+
+    if all_deals:
         logger.info(
-            f"[INFO] 키워드 처리: [{keyword.title}] 신규 핫딜 {len(crawled_data)}건 발견"
+            f"[INFO] 키워드 처리: [{keyword.title}] 신규 핫딜 {len(all_deals)}건 발견"
         )
-        return keyword, crawled_data
+        return keyword, all_deals
     else:
         logger.info(f"[INFO] 키워드 처리: [{keyword.title}] 크롤링 결과 없음")
         return None
 
 
-async def get_new_hotdeal_keywords(
+async def get_new_hotdeal_keywords_for_site(
     session: AsyncSession,
     keyword: Keyword,
     client: httpx.AsyncClient,
+    site: SiteName,
 ) -> list[CrawledKeyword]:
     """
-    새로운 핫딜 키워드를 조회합니다.
+    특정 사이트에서 새로운 핫딜 키워드를 조회합니다.
     1. 해당 키워드로 크롤링을 수행하여 최신 핫딜 목록을 가져옵니다.
     2. DB에서 이전에 저장된 KeywordSite 정보를 조회하여 마지막으로 확인한 핫딜을 찾습니다.
     3. 최신 핫딜 목록과 마지막 확인 핫딜을 비교하여 새로운 핫딜만 필터링합니다.
@@ -100,15 +118,15 @@ async def get_new_hotdeal_keywords(
     5. 새로운 핫딜이 없는 경우, 빈 목록을 반환합니다.
     """
     # 1. 크롤링으로 최신 핫딜 목록 가져오기
-    algumon_crawler: BaseCrawler = AlgumonCrawler(keyword=keyword.title, client=client)
-    latest_products: list[CrawledKeyword] = await algumon_crawler.fetchparse()
+    crawler = get_crawler(site, keyword.title, client)
+    latest_products: list[CrawledKeyword] = await crawler.fetchparse()
 
     if not latest_products:
         return []
 
     # 2. DB에서 이전에 저장된 KeywordSite 정보 조회
     stmt = select(KeywordSite).where(
-        KeywordSite.site_name == SiteName.ALGUMON,
+        KeywordSite.site_name == site,
         KeywordSite.keyword_id == keyword.id,
     )
     result: Result = await session.execute(stmt)
@@ -144,7 +162,7 @@ async def get_new_hotdeal_keywords(
             # 첫 크롤링 정보 저장
             new_site_entry = KeywordSite(
                 keyword_id=keyword.id,
-                site_name=SiteName.ALGUMON,
+                site_name=site,
                 external_id=newest_product.id,
                 link=newest_product.link,
                 price=newest_product.price,
@@ -157,6 +175,20 @@ async def get_new_hotdeal_keywords(
 
     # 5. 새로운 핫딜이 없으면 빈 목록 반환
     return []
+
+
+async def get_new_hotdeal_keywords(
+    session: AsyncSession,
+    keyword: Keyword,
+    client: httpx.AsyncClient,
+) -> list[CrawledKeyword]:
+    """
+    새로운 핫딜 키워드를 조회합니다. (하위 호환성 유지)
+    내부적으로 get_new_hotdeal_keywords_for_site()를 호출합니다.
+    """
+    return await get_new_hotdeal_keywords_for_site(
+        session, keyword, client, SiteName.ALGUMON
+    )
 
 
 async def job():
@@ -209,16 +241,18 @@ async def job():
 
     id_to_crawled_keyword: dict[Keyword, list[CrawledKeyword]] = {}
 
-    # 동시 실행 개수를 5개로 제한하는 세마포어 생성
-    semaphore = asyncio.Semaphore(5)
+    # 사이트별 동시 실행 개수를 2개로 제한하는 세마포어 생성
+    site_semaphores = {site: asyncio.Semaphore(2) for site in get_active_sites()}
+    # 키워드별 동시 실행 개수를 5개로 제한하는 세마포어
+    keyword_semaphore = asyncio.Semaphore(5)
 
     async with httpx.AsyncClient() as client:
         # 각 키워드를 세마포어 제어 하에 처리하는 태스크 리스트 생성
         async def sem_handle_keyword(keyword: Keyword):
-            async with semaphore:
+            async with keyword_semaphore:
                 # 세마포어 내에서도 짧은 랜덤 딜레이를 주면 부하를 더 분산시킬 수 있습니다.
                 await asyncio.sleep(random.uniform(0.5, 1.5))
-                return await handle_keyword(keyword, client)
+                return await handle_keyword(keyword, client, site_semaphores)
 
         tasks = [sem_handle_keyword(kw) for kw in keywords_to_process]
 
