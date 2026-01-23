@@ -1,5 +1,6 @@
 import re
 
+import httpx
 from bs4 import BeautifulSoup
 
 from app.src.core.logger import logger
@@ -11,9 +12,22 @@ from app.src.Infrastructure.crawling.base_crawler import BaseCrawler
 class FmkoreaCrawler(BaseCrawler):
     requires_browser = True
 
+    def __init__(
+        self,
+        keyword: str,
+        client: httpx.AsyncClient,
+        max_pages: int = 3,
+    ):
+        super().__init__(keyword=keyword, client=client)
+        self.max_pages = max_pages
+
     @property
     def url(self) -> str:
         return "https://www.fmkorea.com/hotdeal"
+
+    def get_page_url(self, page: int) -> str:
+        """페이지 번호에 해당하는 URL을 반환합니다."""
+        return f"https://www.fmkorea.com/index.php?mid=hotdeal&page={page}"
 
     @property
     def site_name(self) -> SiteName:
@@ -102,3 +116,30 @@ class FmkoreaCrawler(BaseCrawler):
                     meta_parts.append(f"배송: {delivery_link.get_text(strip=True)}")
 
         return " | ".join(meta_parts)
+
+    async def fetchparse(self) -> list[CrawledKeyword]:
+        """여러 페이지를 크롤링하여 결과를 합칩니다."""
+        all_results: list[CrawledKeyword] = []
+        seen_ids: set[str] = set()
+
+        for page in range(1, self.max_pages + 1):
+            page_url = self.get_page_url(page)
+            html = await self.fetch(page_url)
+
+            if not html:
+                logger.warning(f"[{self.keyword}] 페이지 {page} 크롤링 실패: {page_url}")
+                continue
+
+            page_results = self.parse(html)
+            logger.info(
+                f"[{self.keyword}] 페이지 {page}/{self.max_pages}: {len(page_results)}개 발견"
+            )
+
+            # 중복 제거
+            for result in page_results:
+                if result.id not in seen_ids:
+                    seen_ids.add(result.id)
+                    all_results.append(result)
+
+        self.results = all_results
+        return self.results

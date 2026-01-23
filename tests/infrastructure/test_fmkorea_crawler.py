@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -208,6 +208,191 @@ class TestFmkoreaCrawlerParse:
         result = crawler.parse(html)
 
         assert result == []
+
+
+class TestFmkoreaCrawlerPagination:
+    """FmkoreaCrawler 페이지네이션 테스트"""
+
+    @pytest.fixture
+    def crawler(self):
+        """FmkoreaCrawler 인스턴스"""
+        from app.src.Infrastructure.crawling.crawlers.fmkorea import FmkoreaCrawler
+
+        mock_client = MagicMock()
+        return FmkoreaCrawler(keyword="아이폰", client=mock_client)
+
+    def test_max_pages_default_value(self, crawler):
+        """max_pages 기본값이 3이어야 함"""
+        assert crawler.max_pages == 3
+
+    def test_get_page_url_returns_first_page_url(self, crawler):
+        """get_page_url(1)은 첫 페이지 URL을 반환해야 함"""
+        url = crawler.get_page_url(1)
+        assert url == "https://www.fmkorea.com/index.php?mid=hotdeal&page=1"
+
+    def test_get_page_url_returns_correct_page_url(self, crawler):
+        """get_page_url(N)은 해당 페이지 URL을 반환해야 함"""
+        assert crawler.get_page_url(2) == "https://www.fmkorea.com/index.php?mid=hotdeal&page=2"
+        assert crawler.get_page_url(5) == "https://www.fmkorea.com/index.php?mid=hotdeal&page=5"
+
+    def test_url_property_still_returns_base_url(self, crawler):
+        """url 속성은 기본 URL을 반환해야 함 (하위 호환성)"""
+        assert crawler.url == "https://www.fmkorea.com/hotdeal"
+
+    def test_custom_max_pages(self):
+        """max_pages를 커스텀 값으로 설정할 수 있어야 함"""
+        from app.src.Infrastructure.crawling.crawlers.fmkorea import FmkoreaCrawler
+
+        mock_client = MagicMock()
+        crawler = FmkoreaCrawler(keyword="테스트", client=mock_client, max_pages=5)
+
+        assert crawler.max_pages == 5
+
+
+class TestFmkoreaCrawlerFetchparse:
+    """FmkoreaCrawler.fetchparse() 다중 페이지 테스트"""
+
+    @pytest.fixture
+    def sample_html_page1(self):
+        """페이지 1 샘플 HTML (아이폰 포함)"""
+        return """
+        <div class="fm_best_widget">
+            <div class="li">
+                <div class="title">
+                    <a href="/1001">[11번가] 아이폰 15 프로</a>
+                </div>
+                <div class="hotdeal_info">
+                    <span>쇼핑몰: <a href="#">11번가</a></span>
+                    <span>가격: <a href="#">1,190,000원</a></span>
+                </div>
+            </div>
+        </div>
+        """
+
+    @pytest.fixture
+    def sample_html_page2(self):
+        """페이지 2 샘플 HTML (아이폰 포함)"""
+        return """
+        <div class="fm_best_widget">
+            <div class="li">
+                <div class="title">
+                    <a href="/2001">[쿠팡] 아이폰 14 할인</a>
+                </div>
+                <div class="hotdeal_info">
+                    <span>쇼핑몰: <a href="#">쿠팡</a></span>
+                    <span>가격: <a href="#">990,000원</a></span>
+                </div>
+            </div>
+        </div>
+        """
+
+    @pytest.fixture
+    def sample_html_no_keyword(self):
+        """키워드 없는 페이지 샘플 HTML"""
+        return """
+        <div class="fm_best_widget">
+            <div class="li">
+                <div class="title">
+                    <a href="/3001">[네이버] 갤럭시 S24</a>
+                </div>
+                <div class="hotdeal_info">
+                    <span>쇼핑몰: <a href="#">네이버</a></span>
+                </div>
+            </div>
+        </div>
+        """
+
+    @pytest.mark.asyncio
+    async def test_fetchparse_fetches_multiple_pages(
+        self, sample_html_page1, sample_html_page2
+    ):
+        """fetchparse()는 max_pages만큼 페이지를 가져와야 함"""
+        from app.src.Infrastructure.crawling.crawlers.fmkorea import FmkoreaCrawler
+
+        mock_client = MagicMock()
+        crawler = FmkoreaCrawler(keyword="아이폰", client=mock_client, max_pages=2)
+
+        # fetch 메서드를 mock하여 페이지별로 다른 HTML 반환
+        call_count = 0
+
+        async def mock_fetch(url, timeout=10):
+            nonlocal call_count
+            call_count += 1
+            if "page=1" in url:
+                return sample_html_page1
+            elif "page=2" in url:
+                return sample_html_page2
+            return None
+
+        with patch.object(crawler, "fetch", side_effect=mock_fetch):
+            results = await crawler.fetchparse()
+
+        # 2개 페이지에서 각각 1개씩, 총 2개 결과
+        assert len(results) == 2
+        assert call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_fetchparse_deduplicates_results(self, sample_html_page1):
+        """fetchparse()는 중복 ID를 제거해야 함"""
+        from app.src.Infrastructure.crawling.crawlers.fmkorea import FmkoreaCrawler
+
+        mock_client = MagicMock()
+        crawler = FmkoreaCrawler(keyword="아이폰", client=mock_client, max_pages=2)
+
+        # 두 페이지 모두 같은 ID 반환
+        async def mock_fetch(url, timeout=10):
+            return sample_html_page1
+
+        with patch.object(crawler, "fetch", side_effect=mock_fetch):
+            results = await crawler.fetchparse()
+
+        # 중복 제거되어 1개만 반환
+        assert len(results) == 1
+        assert results[0].id == "1001"
+
+    @pytest.mark.asyncio
+    async def test_fetchparse_continues_on_page_failure(
+        self, sample_html_page1, sample_html_page2
+    ):
+        """fetchparse()는 한 페이지가 실패해도 계속 진행해야 함"""
+        from app.src.Infrastructure.crawling.crawlers.fmkorea import FmkoreaCrawler
+
+        mock_client = MagicMock()
+        crawler = FmkoreaCrawler(keyword="아이폰", client=mock_client, max_pages=3)
+
+        # 페이지 2는 실패
+        async def mock_fetch(url, timeout=10):
+            if "page=1" in url:
+                return sample_html_page1
+            elif "page=2" in url:
+                return None  # 실패
+            elif "page=3" in url:
+                return sample_html_page2
+            return None
+
+        with patch.object(crawler, "fetch", side_effect=mock_fetch):
+            results = await crawler.fetchparse()
+
+        # 페이지 1과 3에서 결과 수집
+        assert len(results) == 2
+
+    @pytest.mark.asyncio
+    async def test_fetchparse_returns_empty_when_no_matches(
+        self, sample_html_no_keyword
+    ):
+        """fetchparse()는 매칭되는 키워드가 없으면 빈 리스트를 반환해야 함"""
+        from app.src.Infrastructure.crawling.crawlers.fmkorea import FmkoreaCrawler
+
+        mock_client = MagicMock()
+        crawler = FmkoreaCrawler(keyword="아이폰", client=mock_client, max_pages=2)
+
+        async def mock_fetch(url, timeout=10):
+            return sample_html_no_keyword
+
+        with patch.object(crawler, "fetch", side_effect=mock_fetch):
+            results = await crawler.fetchparse()
+
+        assert results == []
 
 
 class TestFmkoreaRegistry:
