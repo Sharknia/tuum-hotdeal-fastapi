@@ -612,52 +612,6 @@ button:hover {
     color: #333;
 }
 
-/* 공사중 페이지 스타일 */
-.construction-notice {
-    background-color: #fff3cd;
-    border: 1px solid #ffeeba;
-    border-radius: 8px;
-    padding: 2rem;
-    margin: 2rem auto;
-    max-width: 600px;
-    text-align: center;
-}
-
-.construction-notice i {
-    font-size: 2.5rem;
-    color: #856404;
-    margin-bottom: 1rem;
-}
-
-.construction-notice p {
-    color: #856404;
-    margin: 0.5rem 0;
-}
-
-.welcome-section h2 i {
-    margin-right: 0.5rem;
-}
-
-.welcome-section {
-    text-align: center;
-    padding: 3rem 1rem;
-}
-
-.welcome-section h2 {
-    color: #333;
-    font-size: 2.5rem;
-    margin-bottom: 1rem;
-}
-
-.action-section {
-    text-align: center;
-    margin-top: 2rem;
-}
-
-.start-chat-button:hover {
-    background-color: #0056b3;
-}
-
 /* 핫딜 페이지 스타일 */
 .hotdeal-page {
     /* 기존 home-page 스타일과 유사하게 설정하거나 필요에 맞게 조정 */

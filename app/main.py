@@ -133,10 +133,6 @@ if settings.ENVIRONMENT == "local":
     async def signup_page():
         return FileResponse("static/signup.html")
 
-    @app.get("/home", response_class=FileResponse)
-    async def home_page():
-        return FileResponse("static/home.html")
-
     @app.get("/hotdeal", response_class=FileResponse)
     async def hotdeal_page():
         return FileResponse("static/hotdeal.html")

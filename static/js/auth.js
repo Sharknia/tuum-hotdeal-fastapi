@@ -206,21 +206,7 @@ async function fetchWithAuth(url, options = {}) {
 }
 
 /**
- * 로그인 상태를 확인하는 함수
- * @returns {Promise<boolean>} 로그인되어 있지 않으면 false, 로그인되어 있으면 true를 반환
- */
-async function checkLoginStatus() {
-    try {
-        const response = await fetchWithAuth('/user/v1/me');
-        return response.ok;
-    } catch (error) {
-        console.error('인증 확인 실패:', error);
-        return false;
-    }
-}
-
-/**
- * 사용자 정보를 가져오는 함수
+ * 사용자 정보를 가져오는 함수 (로그인 상태 확인 겸용 - null이면 미로그인)
  * @returns {Promise<Object>} 사용자 정보 객체 또는 null
  */
 async function getUserInfo() {
