@@ -7,12 +7,8 @@
         <script src="./js/auth.js?v=1.0.0"></script>
         <script>
             (async () => {
-                const isLogin = await checkLoginStatus();
-                if (!isLogin) {
-                    window.location.href = '/login';
-                } else {
-                    window.location.href = '/home';
-                }
+                const userInfo = await getUserInfo();
+                window.location.href = userInfo ? '/hotdeal' : '/login';
             })();
         </script>
     </head>
