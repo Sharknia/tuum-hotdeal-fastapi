@@ -103,8 +103,6 @@ class FmkoreaCrawler(BaseCrawler):
 
         return None
 
-        return products
-
     def _extract_price(self, row: BeautifulSoup) -> str | None:
         """hotdeal_info에서 가격 정보를 추출합니다."""
         hotdeal_info = row.select_one(".hotdeal_info")
