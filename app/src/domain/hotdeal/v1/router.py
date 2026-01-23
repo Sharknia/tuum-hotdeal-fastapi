@@ -7,12 +7,13 @@ from app.src.core.dependencies.auth import registered_user
 from app.src.core.dependencies.db_session import get_db
 from app.src.core.exceptions.auth_excptions import AuthErrors
 from app.src.core.exceptions.client_exceptions import ClientErrors
-from app.src.domain.hotdeal.schemas import KeywordCreateRequest, KeywordResponse
+from app.src.domain.hotdeal.schemas import KeywordCreateRequest, KeywordResponse, SiteInfo
 from app.src.domain.hotdeal.services import (
     register_keyword,
     unlink_keyword,
     view_users_keywords,
 )
+from app.src.Infrastructure.crawling.crawlers import get_site_info_list
 from app.src.domain.user.schemas import (
     AuthenticatedUser,
 )
@@ -90,3 +91,12 @@ async def get_my_keywords_list(
         user_id=login_user.user_id,
     )
     return result
+
+
+@router.get(
+    "/sites",
+    status_code=status.HTTP_200_OK,
+    summary="지원 사이트 목록 조회",
+)
+def get_sites() -> list[SiteInfo]:
+    return get_site_info_list()

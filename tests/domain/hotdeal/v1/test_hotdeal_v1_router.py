@@ -153,3 +153,49 @@ async def test_get_my_keywords_list(
     assert response.json() == [
         {"id": 1, "title": "keyword"},
     ]
+
+
+class TestGetSitesEndpoint:
+    def test_get_sites_returns_200(self, mock_client):
+        # when
+        response: Response = mock_client.get("/api/hotdeal/v1/sites")
+
+        # then
+        assert response.status_code == 200
+
+    def test_get_sites_returns_list(self, mock_client):
+        # when
+        response: Response = mock_client.get("/api/hotdeal/v1/sites")
+
+        # then
+        assert isinstance(response.json(), list)
+        assert len(response.json()) > 0
+
+    def test_get_sites_contains_required_fields(self, mock_client):
+        # when
+        response: Response = mock_client.get("/api/hotdeal/v1/sites")
+
+        # then
+        for site in response.json():
+            assert "name" in site
+            assert "display_name" in site
+            assert "search_url_template" in site
+
+    def test_get_sites_contains_all_active_sites(self, mock_client):
+        # given
+        from app.src.Infrastructure.crawling.crawlers import get_active_sites
+
+        # when
+        response: Response = mock_client.get("/api/hotdeal/v1/sites")
+        site_names = [site["name"] for site in response.json()]
+
+        # then
+        for site in get_active_sites():
+            assert site.value in site_names
+
+    def test_get_sites_no_auth_required(self, mock_client):
+        # when
+        response: Response = mock_client.get("/api/hotdeal/v1/sites")
+
+        # then
+        assert response.status_code == 200

@@ -20,6 +20,9 @@ ENV PYTHONPATH=/app
 COPY pyproject.toml poetry.lock* /app/
 RUN poetry config virtualenvs.create false && poetry install --no-interaction --no-ansi --no-root
 
+# Playwright 브라우저 및 시스템 의존성 설치
+RUN playwright install chromium && playwright install-deps chromium
+
 COPY . /app
 
 COPY entrypoint.sh /app/entrypoint.sh

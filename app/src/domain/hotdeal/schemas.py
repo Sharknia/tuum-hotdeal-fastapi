@@ -20,3 +20,9 @@ class KeywordCreateRequest(BaseModel):
 class KeywordResponse(BaseModel):
     id: int
     title: str
+
+
+class SiteInfo(BaseModel):
+    name: SiteName
+    display_name: str
+    search_url_template: str

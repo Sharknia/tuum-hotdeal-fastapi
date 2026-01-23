@@ -47,7 +47,7 @@
             </section>
         </main>
         <script src="./js/auth.js?v=1.0.1"></script>
-        <script src="./js/keyword_manager.js?v=1.0.0"></script>
+        <script src="./js/keyword_manager.js?v=1.1.0"></script>
         <script>
             (async () => {
                 if (!hasValidTokens()) {
@@ -58,7 +58,7 @@
                 async function startApp() {
                     const [userInfo] = await Promise.all([
                         getUserInfo(),
-                        loadKeywords()
+                        initKeywordManager()
                     ]);
 
                     if (!userInfo) {

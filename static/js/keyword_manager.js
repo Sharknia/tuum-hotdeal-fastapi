@@ -1,30 +1,50 @@
 const keywordListElement = document.getElementById('hotdeal-keyword-list');
 const keywordInputElement = document.getElementById('hotdeal-keyword-input');
 
-// 검색 링크 설정
-// NOTE: 현재 API는 키워드별 사이트 정보를 반환하지 않으므로 대표 사이트(알구몬)를 사용
-// 향후 멀티사이트 지원 시 API 확장 후 사이트별 링크 생성 가능
-const DEFAULT_SEARCH_SITE = {
-    name: '알구몬',
-    searchUrl: (keyword) => `https://www.algumon.com/search/${encodeURIComponent(keyword)}`,
-};
+let siteList = [];
 
-// UI 업데이트 함수
+async function loadSites() {
+    try {
+        const response = await fetch('/api/hotdeal/v1/sites');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        siteList = await response.json();
+    } catch (error) {
+        console.error('사이트 목록 로드 실패:', error);
+        siteList = [];
+    }
+}
+
+function buildSearchUrl(template, keyword) {
+    return template.replace('{keyword}', encodeURIComponent(keyword));
+}
+
+function renderSiteLinks(keyword) {
+    if (siteList.length === 0) {
+        return '';
+    }
+    return siteList
+        .map(
+            (site) =>
+                `<a href="${buildSearchUrl(site.search_url_template, keyword)}" target="_blank" class="search-link-button" title="${site.display_name}에서 검색">${site.display_name}</a>`
+        )
+        .join('');
+}
+
 function renderKeywords(keywords) {
-    keywordListElement.innerHTML = ''; // 기존 목록 초기화
+    keywordListElement.innerHTML = '';
     if (!keywords || keywords.length === 0) {
         keywordListElement.innerHTML = '<li>등록된 키워드가 없습니다.</li>';
         return;
     }
     keywords.forEach((keyword) => {
         const listItem = document.createElement('li');
-        listItem.dataset.id = keyword.id; // data-id 속성 추가
+        listItem.dataset.id = keyword.id;
         listItem.innerHTML = `
             <span class="keyword-title">${keyword.title}</span>
             <div class="keyword-actions">
-                <a href="${DEFAULT_SEARCH_SITE.searchUrl(keyword.title)}" target="_blank" class="search-link-button" title="${DEFAULT_SEARCH_SITE.name}에서 검색하기">
-                    전체 목록 보기
-                </a>
+                ${renderSiteLinks(keyword.title)}
                 <button class="delete-button" title="키워드 삭제">삭제</button>
             </div>
         `;
@@ -32,7 +52,6 @@ function renderKeywords(keywords) {
     });
 }
 
-// 키워드 목록 로드 함수
 async function loadKeywords() {
     try {
         const response = await fetchWithAuth('/hotdeal/v1/keywords');
@@ -47,24 +66,19 @@ async function loadKeywords() {
     }
 }
 
-// 키워드 추가 함수
 async function addKeyword(title) {
     if (!title) {
         alert('키워드를 입력해주세요.');
         return;
     }
-    // title에 특수문자가 포함되어 있으면 추가 불가
     if (title.match(/[^\w\s가-힣]/)) {
         alert('키워드에 특수문자를 포함할 수 없습니다.');
         keywordInputElement.value = '';
         return;
     }
-    // title 공백 제거
     title = title.trim();
-    // title이 빈 문자열이면 추가 불가
     if (title.length === 0) {
         alert('빈 공백만은 입력이 불가능합니다.');
-        // 입력창 초기화
         keywordInputElement.value = '';
         return;
     }
@@ -80,15 +94,13 @@ async function addKeyword(title) {
             if (response.status === 400) {
                 const errorData = await response.json();
                 alert(`키워드 추가 실패: ${errorData.detail || '잘못된 요청입니다.'}`);
-                // 입력창 초기화
                 keywordInputElement.value = '';
             } else {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
         } else {
-            // 성공 시 목록 새로고침
             await loadKeywords();
-            keywordInputElement.value = ''; // 입력 필드 초기화
+            keywordInputElement.value = '';
         }
     } catch (error) {
         console.error('키워드 추가 실패:', error);
@@ -96,7 +108,6 @@ async function addKeyword(title) {
     }
 }
 
-// 키워드 삭제 함수
 async function deleteKeyword(keywordId) {
     if (!keywordId) {
         console.error('삭제할 키워드의 ID가 없습니다.');
@@ -116,13 +127,16 @@ async function deleteKeyword(keywordId) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
         } else if (response.status === 204) {
-            // No Content 성공 응답
             console.log('키워드 삭제 성공');
-            // 성공 시 목록 새로고침
             await loadKeywords();
         }
     } catch (error) {
         console.error('키워드 삭제 실패:', error);
         alert('키워드 삭제 중 오류가 발생했습니다.');
     }
+}
+
+async function initKeywordManager() {
+    await loadSites();
+    await loadKeywords();
 }
