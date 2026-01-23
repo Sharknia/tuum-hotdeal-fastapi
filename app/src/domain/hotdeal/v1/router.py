@@ -13,10 +13,10 @@ from app.src.domain.hotdeal.services import (
     unlink_keyword,
     view_users_keywords,
 )
-from app.src.Infrastructure.crawling.crawlers import get_site_info_list
 from app.src.domain.user.schemas import (
     AuthenticatedUser,
 )
+from app.src.Infrastructure.crawling.crawlers import get_site_info_list
 from app.src.utils.swsagger_helper import create_responses
 
 router = APIRouter(prefix="/v1", tags=["hotdeal"])

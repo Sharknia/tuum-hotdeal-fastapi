@@ -46,5 +46,5 @@ def get_site_info_list() -> list[SiteInfo]:
             display_name=SITE_METADATA[site]["display_name"],
             search_url_template=SITE_METADATA[site]["search_url_template"],
         )
-        for site in CRAWLER_REGISTRY.keys()
+        for site in CRAWLER_REGISTRY
     ]
