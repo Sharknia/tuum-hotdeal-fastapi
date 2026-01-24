@@ -71,8 +71,8 @@ class BaseCrawler(ABC):
 
     async def _fetch_with_browser(self, url: str, wait_seconds: int = 3) -> str | None:
         logger.info(f"[{self.keyword}] 브라우저 요청: {url}")
-        fetcher = BrowserFetcher()
-        return await fetcher.fetch(url, wait_seconds=wait_seconds)
+        async with BrowserFetcher() as fetcher:
+            return await fetcher.fetch(url, wait_seconds=wait_seconds)
 
     async def _fetch_with_proxy(self, url: str, timeout: int = 20) -> str | None:
         for _ in range(15):

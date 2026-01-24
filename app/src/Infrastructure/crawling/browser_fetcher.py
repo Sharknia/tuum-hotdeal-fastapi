@@ -51,12 +51,12 @@ class BrowserFetcher:
                 viewport={"width": 1920, "height": 1080},
             )
 
-            await context.route(
-                BLOCKED_RESOURCE_PATTERNS,
-                lambda route: route.abort(),
-            )
-
             try:
+                await context.route(
+                    BLOCKED_RESOURCE_PATTERNS,
+                    lambda route: route.abort(),
+                )
+
                 page = await context.new_page()
                 logger.info(f"[BrowserFetcher] 요청: {url}")
 
