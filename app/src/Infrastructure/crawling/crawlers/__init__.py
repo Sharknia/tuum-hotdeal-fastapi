@@ -18,10 +18,10 @@ SITE_METADATA: dict[SiteName, dict[str, str]] = {
         "display_name": "알구몬",
         "search_url_template": "https://www.algumon.com/search/{keyword}",
     },
-    SiteName.FMKOREA: {
-        "display_name": "FM코리아",
-        "search_url_template": "https://www.fmkorea.com/search.php?mid=hotdeal&search_keyword={keyword}&search_target=title_content",
-    },
+    # SiteName.FMKOREA: {
+    #     "display_name": "FM코리아",
+    #     "search_url_template": "https://www.fmkorea.com/search.php?mid=hotdeal&search_keyword={keyword}&search_target=title_content",
+    # },
     SiteName.RULIWEB: {
         "display_name": "루리웹",
         "search_url_template": "https://bbs.ruliweb.com/market/board/1020?search_type=subject&search_key={keyword}",
