@@ -81,16 +81,3 @@ class TestGetSiteInfoList:
         assert ruliweb is not None
         assert ruliweb.display_name == "루리웹"
         assert "ruliweb.com" in ruliweb.search_url_template
-
-    def test_fmkorea_site_info(self):
-        # given
-        from app.src.Infrastructure.crawling.crawlers import get_site_info_list
-
-        # when
-        result = get_site_info_list()
-        fmkorea = next((s for s in result if s.name == SiteName.FMKOREA), None)
-
-        # then
-        assert fmkorea is not None
-        assert fmkorea.display_name == "FM코리아"
-        assert "fmkorea.com" in fmkorea.search_url_template

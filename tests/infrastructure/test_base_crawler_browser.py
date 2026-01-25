@@ -89,6 +89,8 @@ class TestFetchMethodBranching:
         ) as MockBrowserFetcher:
             mock_fetcher = AsyncMock()
             mock_fetcher.fetch = AsyncMock(return_value="<html>browser content</html>")
+            mock_fetcher.__aenter__ = AsyncMock(return_value=mock_fetcher)
+            mock_fetcher.__aexit__ = AsyncMock(return_value=None)
             MockBrowserFetcher.return_value = mock_fetcher
 
             crawler = MockBrowserCrawler(keyword="test", client=mock_client)
@@ -108,6 +110,8 @@ class TestFetchMethodBranching:
         ) as MockBrowserFetcher:
             mock_fetcher = AsyncMock()
             mock_fetcher.fetch = AsyncMock(return_value=None)
+            mock_fetcher.__aenter__ = AsyncMock(return_value=mock_fetcher)
+            mock_fetcher.__aexit__ = AsyncMock(return_value=None)
             MockBrowserFetcher.return_value = mock_fetcher
 
             crawler = MockBrowserCrawler(keyword="test", client=mock_client)

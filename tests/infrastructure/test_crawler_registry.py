@@ -25,9 +25,12 @@ class TestCrawlerRegistry:
         assert crawler.client is mock_client
 
     def test_all_site_names_are_registered(self):
-        """모든 SiteName enum이 레지스트리에 등록되어 있어야 함"""
+        """지원되는 SiteName enum이 레지스트리에 등록되어 있어야 함 (FMKOREA 제외)"""
         for site in SiteName:
-            assert site in CRAWLER_REGISTRY, f"{site} is not registered in CRAWLER_REGISTRY"
+            if site == SiteName.FMKOREA:
+                assert site not in CRAWLER_REGISTRY
+            else:
+                assert site in CRAWLER_REGISTRY, f"{site} is not registered in CRAWLER_REGISTRY"
 
     def test_get_active_sites_returns_registered_sites(self):
         """get_active_sites는 등록된 모든 사이트를 반환해야 함"""
