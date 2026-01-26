@@ -206,7 +206,10 @@ async def test_job_e2e(mock_db_session, keyword_in_db):
         ) as mock_send_email,
         patch("app.worker_main.AsyncSessionLocal", return_value=mock_db_session),
         patch("app.worker_main.settings.ENVIRONMENT", "prod"),
+        patch("app.worker_main.SharedBrowser") as mock_shared,
     ):
+        mock_shared.get_instance.return_value.start = AsyncMock()
+        mock_shared.get_instance.return_value.stop = AsyncMock()
         mock_get_new.return_value = CRAWLED_DATA_NEW
         mock_send_email.return_value = None
 
