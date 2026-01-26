@@ -15,7 +15,7 @@ class FmkoreaCrawler(BaseCrawler):
     @property
     def url(self) -> str:
         encoded_keyword = quote(self.keyword)
-        return f"https://www.fmkorea.com/search.php?mid=hotdeal&search_keyword={encoded_keyword}&search_target=title_content"
+        return f"https://www.fmkorea.com/search.php?mid=hotdeal&search_keyword={encoded_keyword}&search_target=title_content&sort_index=regdate&order_type=desc"
 
     @property
     def site_name(self) -> SiteName:

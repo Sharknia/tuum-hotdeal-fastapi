@@ -55,6 +55,8 @@ class TestFmkoreaCrawler:
         assert "search.php" in crawler.url
         assert "search_keyword=%ED%85%8C%EC%8A%A4%ED%8A%B8" in crawler.url
         assert "mid=hotdeal" in crawler.url
+        assert "sort_index=regdate" in crawler.url
+        assert "order_type=desc" in crawler.url
 
     def test_parse_success(self, crawler, fmkorea_html):
         """parse()가 정상 항목만 추출하고 종료된 항목은 무시해야 함"""
