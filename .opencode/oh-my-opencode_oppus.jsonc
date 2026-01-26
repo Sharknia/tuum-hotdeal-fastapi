@@ -1,0 +1,117 @@
+{
+    "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
+    "google_auth": false,
+
+    // 비활성화할 에이전트 목록 (루트 레벨에 위치해야 함)
+    // "disabled_agents": ["sisyphus"],
+
+    // ============================================================
+    // AGENTS 설정
+    // ============================================================
+    "agents": {
+        // 원본 기본값: anthropic/claude-opus-4-5 (variant: max)
+        "sisyphus": {
+            "model": "google/antigravity-gemini-3-flash",
+        },
+
+        // 원본 기본값: zai-coding-plan/glm-4.7
+        "librarian": {
+            "model": "google/antigravity-gemini-3-flash",
+        },
+
+        // 원본 기본값: anthropic/claude-haiku-4-5
+        "explore": {
+            "model": "google/antigravity-gemini-3-flash",
+        },
+
+        // 원본 기본값: openai/gpt-5.2 (variant: high)
+        "oracle": {
+            "model": "google/antigravity-claude-opus-4-5-thinking",
+        },
+
+        // 원본 기본값: (커스텀 에이전트)
+        "frontend-ui-ux-engineer": {
+            "model": "google/antigravity-gemini-3-pro-high",
+        },
+
+        // 원본 기본값: (커스텀 에이전트)
+        "document-writer": {
+            "model": "google/antigravity-gemini-3-flash",
+        },
+
+        // 원본 기본값: google/gemini-3-flash
+        "multimodal-looker": {
+            "model": "google/antigravity-gemini-3-flash",
+        },
+
+        // 원본 기본값: anthropic/claude-opus-4-5 (variant: max)
+        "prometheus": {
+            "model": "google/antigravity-claude-opus-4-5-thinking",
+        },
+
+        // 원본 기본값: anthropic/claude-opus-4-5 (variant: max)
+        "metis": {
+            "model": "google/antigravity-claude-opus-4-5-thinking",
+        },
+
+        // 원본 기본값: openai/gpt-5.2 (variant: medium)
+        "momus": {
+            "model": "google/antigravity-claude-opus-4-5-thinking",
+        },
+
+        // 원본 기본값: anthropic/claude-sonnet-4-5
+        "atlas": {
+            "model": "google/antigravity-claude-opus-4-5-thinking",
+        },
+    },
+
+    // ============================================================
+    // CATEGORIES 설정 (delegate_task에서 사용)
+    // ============================================================
+    "categories": {
+        // 원본 기본값: google/gemini-3-pro
+        // 용도: Frontend, UI/UX, design, styling, animation
+        "visual-engineering": {
+            "model": "google/antigravity-gemini-3-pro-high",
+        },
+
+        // 원본 기본값: openai/gpt-5.2-codex (variant: xhigh)
+        // 용도: Deep logical reasoning, complex architecture decisions
+        "ultrabrain": {
+            "model": "google/antigravity-claude-opus-4-5-thinking",
+            "variant": "xhigh",
+        },
+
+        // 원본 기본값: google/gemini-3-pro (variant: max)
+        // 용도: Highly creative/artistic tasks, novel ideas
+        "artistry": {
+            "model": "google/antigravity-gemini-3-pro-high",
+            "variant": "max",
+        },
+
+        // 원본 기본값: anthropic/claude-haiku-4-5
+        // 용도: Small/quick tasks, minimal overhead
+        "quick": {
+            "model": "google/antigravity-gemini-3-flash",
+        },
+
+        // 원본 기본값: anthropic/claude-sonnet-4-5
+        // 용도: Moderate effort tasks that don't fit specific categories
+        "unspecified-low": {
+            "model": "google/antigravity-gemini-3-flash",
+        },
+
+        // 원본 기본값: anthropic/claude-opus-4-5 (variant: max)
+        // 용도: Substantial effort across multiple systems/modules
+        "unspecified-high": {
+            "model": "google/antigravity-claude-opus-4-5-thinking",
+            "variant": "max",
+        },
+
+        // 원본 기본값: google/gemini-3-flash
+        // 용도: Writing/prose tasks, documentation, READMEs, articles
+        "writing": {
+            "model": "google/antigravity-gemini-3-flash",
+        },
+    },
+}
