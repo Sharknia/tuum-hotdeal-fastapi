@@ -1,8 +1,7 @@
 import re
 from typing import ClassVar, Self
 
-from playwright.async_api import async_playwright
-
+from app.src.Infrastructure.crawling.shared_browser import SharedBrowser
 from app.src.core.logger import logger
 
 DEFAULT_USER_AGENT = (
@@ -30,21 +29,17 @@ class BrowserFetcher:
         self.user_agent = user_agent
         self.headless = headless
         self.locale = locale
-        self._playwright = None
-        self._browser = None
 
     async def _ensure_browser(self):
-        if self._browser is None:
-            self._playwright = await async_playwright().start()
-            self._browser = await self._playwright.chromium.launch(
-                headless=self.headless,
-                args=["--disable-blink-features=AutomationControlled"],
-            )
-        return self._browser
+        return await SharedBrowser.get_instance().get_browser()
 
     async def fetch(self, url: str, wait_seconds: int = 3) -> str | None:
         try:
             browser = await self._ensure_browser()
+            if browser is None:
+                logger.error("[BrowserFetcher] Browser instance is None")
+                return None
+
             context = await browser.new_context(
                 user_agent=self.user_agent,
                 locale=self.locale,
@@ -93,12 +88,7 @@ class BrowserFetcher:
         return any(indicator in html_lower for indicator in CHALLENGE_INDICATORS)
 
     async def close(self) -> None:
-        if self._browser:
-            await self._browser.close()
-            self._browser = None
-        if self._playwright:
-            await self._playwright.stop()
-            self._playwright = None
+        pass
 
     async def __aenter__(self) -> Self:
         return self

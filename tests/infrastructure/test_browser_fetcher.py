@@ -37,7 +37,10 @@ class TestBrowserFetcherFetch:
         """fetch()는 HTML 문자열을 반환해야 함"""
         from app.src.Infrastructure.crawling.browser_fetcher import BrowserFetcher
 
-        with patch.object(BrowserFetcher, "_ensure_browser") as mock_ensure:
+        with patch("app.src.Infrastructure.crawling.browser_fetcher.SharedBrowser") as mock_shared:
+            mock_browser = AsyncMock()
+            mock_shared.get_instance.return_value.get_browser = AsyncMock(return_value=mock_browser)
+
             mock_page = AsyncMock()
             mock_page.content.return_value = "<html><body>Test</body></html>"
             mock_page.goto = AsyncMock()
@@ -48,24 +51,22 @@ class TestBrowserFetcherFetch:
             mock_context.route = AsyncMock()
             mock_context.close = AsyncMock()
 
-            mock_browser = AsyncMock()
             mock_browser.new_context.return_value = mock_context
-
-            mock_ensure.return_value = mock_browser
 
             fetcher = BrowserFetcher()
             result = await fetcher.fetch("https://example.com")
 
             assert isinstance(result, str)
             assert "<html>" in result
+            mock_shared.get_instance.assert_called()
 
     @pytest.mark.asyncio
     async def test_fetch_returns_none_on_error(self):
         """fetch()는 에러 시 None을 반환해야 함"""
         from app.src.Infrastructure.crawling.browser_fetcher import BrowserFetcher
 
-        with patch.object(BrowserFetcher, "_ensure_browser") as mock_ensure:
-            mock_ensure.side_effect = Exception("Browser error")
+        with patch("app.src.Infrastructure.crawling.browser_fetcher.SharedBrowser") as mock_shared:
+            mock_shared.get_instance.side_effect = Exception("Browser error")
 
             fetcher = BrowserFetcher()
             result = await fetcher.fetch("https://example.com")
@@ -77,7 +78,10 @@ class TestBrowserFetcherFetch:
         """fetch()는 챌린지 페이지 감지 시 재시도해야 함"""
         from app.src.Infrastructure.crawling.browser_fetcher import BrowserFetcher
 
-        with patch.object(BrowserFetcher, "_ensure_browser") as mock_ensure:
+        with patch("app.src.Infrastructure.crawling.browser_fetcher.SharedBrowser") as mock_shared:
+            mock_browser = AsyncMock()
+            mock_shared.get_instance.return_value.get_browser = AsyncMock(return_value=mock_browser)
+
             mock_page = AsyncMock()
             mock_page.content.side_effect = [
                 "<html>cf-turnstile challenge</html>",
@@ -92,10 +96,7 @@ class TestBrowserFetcherFetch:
             mock_context.route = AsyncMock()
             mock_context.close = AsyncMock()
 
-            mock_browser = AsyncMock()
             mock_browser.new_context.return_value = mock_context
-
-            mock_ensure.return_value = mock_browser
 
             fetcher = BrowserFetcher()
             result = await fetcher.fetch("https://example.com", wait_seconds=1)
@@ -151,18 +152,18 @@ class TestBrowserFetcherContextManager:
 
     @pytest.mark.asyncio
     async def test_close_cleans_up_browser(self):
-        """close()는 브라우저 리소스를 정리해야 함"""
+        """close()는 브라우저를 직접 닫지 않아야 함 (SharedBrowser가 관리)"""
         from app.src.Infrastructure.crawling.browser_fetcher import BrowserFetcher
 
-        fetcher = BrowserFetcher()
-        mock_browser = AsyncMock()
-        mock_playwright = AsyncMock()
-        fetcher._browser = mock_browser
-        fetcher._playwright = mock_playwright
+        with patch("app.src.Infrastructure.crawling.browser_fetcher.SharedBrowser") as mock_shared:
+            mock_browser = AsyncMock()
+            mock_playwright = AsyncMock()
+            mock_instance = mock_shared.get_instance.return_value
+            mock_instance.get_browser.return_value = mock_browser
+            mock_instance._playwright = mock_playwright
 
-        await fetcher.close()
+            fetcher = BrowserFetcher()
+            await fetcher.close()
 
-        mock_browser.close.assert_called_once()
-        mock_playwright.stop.assert_called_once()
-        assert fetcher._browser is None
-        assert fetcher._playwright is None
+            mock_browser.close.assert_not_called()
+            mock_instance.stop.assert_not_called()
