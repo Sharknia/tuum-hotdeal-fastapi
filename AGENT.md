@@ -1,4 +1,7 @@
-> **Always respond in Korean**
+> **[CRITICAL] RESPONSE LANGUAGE: KOREAN (한국어)**
+> **모든 응답, 분석, 제안, 요약은 반드시 '한국어'로 작성하십시오.**
+> **영어는 코드, 파일명, 로그, 기술 고유명사(Docker, FastAPI 등)에만 사용해야 합니다.**
+> **사용자가 영어로 질문하더라도 한국어로 답변하십시오.**
 
 ## Project Identity
 - **Name**: Tuum Hotdeal Service

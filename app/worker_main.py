@@ -140,21 +140,31 @@ async def get_new_hotdeal_keywords_for_site(
         new_deals = latest_products[:1]
     else:
         # 마지막으로 크롤링된 핫딜의 인덱스를 찾음
-        try:
-            last_crawled_index = [p.id for p in latest_products].index(
-                last_crawled_site.external_id
-            )
-            new_deals = latest_products[:last_crawled_index]
-        except ValueError:
-            # 마지막으로 크롤링된 핫딜이 목록에 없으면 전부 새로운 핫딜로 간주
+        anchors = last_crawled_site.external_id.split(",")
+        found_anchor = False
+        for anchor in anchors:
+            if not anchor.strip():
+                continue
+            try:
+                idx = [p.id for p in latest_products].index(anchor.strip())
+                new_deals = latest_products[:idx]
+                found_anchor = True
+                break
+            except ValueError:
+                continue
+
+        if not found_anchor:
             new_deals = latest_products
 
     # 4. 새로운 핫딜이 있으면 DB 업데이트 및 반환
     if new_deals:
-        newest_product = new_deals[0]
+        new_anchors = [p.id for p in latest_products[:3]]
+        new_external_id = ",".join(new_anchors)
+        newest_product = latest_products[0]
+
         if last_crawled_site:
             # 기존 정보 업데이트
-            last_crawled_site.external_id = newest_product.id
+            last_crawled_site.external_id = new_external_id
             last_crawled_site.link = newest_product.link
             last_crawled_site.price = newest_product.price
             last_crawled_site.meta_data = newest_product.meta_data
@@ -164,7 +174,7 @@ async def get_new_hotdeal_keywords_for_site(
             new_site_entry = KeywordSite(
                 keyword_id=keyword.id,
                 site_name=site,
-                external_id=newest_product.id,
+                external_id=new_external_id,
                 link=newest_product.link,
                 price=newest_product.price,
                 meta_data=newest_product.meta_data,

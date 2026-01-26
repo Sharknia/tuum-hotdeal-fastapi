@@ -127,7 +127,7 @@ async def test_get_new_hotdeal_keywords_first_crawl(
             saved_site = result.scalars().one()
 
             assert saved_site is not None
-            assert saved_site.external_id == "101"
+            assert saved_site.external_id == "101,102,103"
 
 
 @pytest.mark.asyncio
@@ -178,7 +178,7 @@ async def test_get_new_hotdeal_keywords_with_new_deals(
 
             # AND: DB의 external_id가 새로운 핫딜의 ID로 업데이트되어야 함
             await mock_db_session.refresh(old_site_data)
-            assert old_site_data.external_id == "101"
+            assert old_site_data.external_id == "101,102,103"
 
 
 @pytest.mark.asyncio
@@ -257,7 +257,7 @@ async def test_get_new_hotdeal_keywords_for_site_first_crawl(
             )
             result = await mock_db_session.execute(stmt)
             saved_site = result.scalars().one()
-            assert saved_site.external_id == "101"
+            assert saved_site.external_id == "101,102,103"
 
 
 @pytest.mark.asyncio
@@ -287,7 +287,7 @@ async def test_get_new_hotdeal_keywords_for_site_with_new_deals(
 
             # AND: DB 업데이트 확인
             await mock_db_session.refresh(old_site_data)
-            assert old_site_data.external_id == "101"
+            assert old_site_data.external_id == "101,102,103"
 
 
 @pytest.mark.asyncio
