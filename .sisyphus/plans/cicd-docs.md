@@ -33,9 +33,9 @@ Create accurate documentation for the existing CI/CD pipeline and deployment arc
 - `AGENT.md` (Concise AI context summary)
 
 ### Definition of Done
-- [ ] `docs/CICD.md` created with accurate steps and diagrams/descriptions.
-- [ ] `AGENT.md` created with key architecture points.
-- [ ] Both files accurate against the codebase state.
+- [x] `docs/CICD.md` created with accurate steps and diagrams/descriptions.
+- [x] `AGENT.md` created with key architecture points.
+- [x] Both files accurate against the codebase state.
 
 ---
 
@@ -71,11 +71,11 @@ Each TODO includes verification to check file existence and content.
   - `README.md`: Existing (partial) docs.
   
   **Acceptance Criteria**:
-  - [ ] File exists: `docs/CICD.md`
-  - [ ] Contains "Pipeline Stages" section
-  - [ ] Contains "Infrastructure" section
-  - [ ] Mentions "Doppler" and "ARM64"
-  - [ ] Notes the "Static Files" limitation
+  - [x] File exists: `docs/CICD.md`
+  - [x] Contains "Pipeline Stages" section
+  - [x] Contains "Infrastructure" section
+  - [x] Mentions "Doppler" and "ARM64"
+  - [x] Notes the "Static Files" limitation
 
 - [x] 2. Create `AGENT.md`
   **What to do**:
@@ -93,11 +93,11 @@ Each TODO includes verification to check file existence and content.
   - `docs/CICD.md`: Summarize from here.
   
   **Acceptance Criteria**:
-  - [ ] File exists: `AGENT.md` (in root)
-  - [ ] First line is `> **Always respond in Korean**`
-  - [ ] File content is in English
-  - [ ] Concise (< 50 lines)
-  - [ ] Accurate summary of architecture
+  - [x] File exists: `AGENT.md` (in root)
+  - [x] First line is `> **Always respond in Korean**`
+  - [x] File content is in English
+  - [x] Concise (< 50 lines)
+  - [x] Accurate summary of architecture
 
 ---
 
