@@ -1,8 +1,8 @@
 import re
 from typing import ClassVar, Self
 
-from app.src.Infrastructure.crawling.shared_browser import SharedBrowser
 from app.src.core.logger import logger
+from app.src.Infrastructure.crawling.shared_browser import SharedBrowser
 
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "

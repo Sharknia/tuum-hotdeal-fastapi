@@ -1,16 +1,18 @@
 import os
 from typing import ClassVar, Optional
-from playwright.async_api import async_playwright, Playwright, Browser
+
+from playwright.async_api import Browser, Playwright, async_playwright
+
 from app.src.core.logger import logger
 
 
 class SharedBrowser:
     _instance: ClassVar[Optional["SharedBrowser"]] = None
-    _current_test: ClassVar[Optional[str]] = None
+    _current_test: ClassVar[str | None] = None
 
     def __init__(self) -> None:
-        self._playwright: Optional[Playwright] = None
-        self._browser: Optional[Browser] = None
+        self._playwright: Playwright | None = None
+        self._browser: Browser | None = None
 
     @classmethod
     def get_instance(cls) -> "SharedBrowser":
@@ -21,7 +23,7 @@ class SharedBrowser:
         return cls._instance
 
     @property
-    def browser(self) -> Optional[Browser]:
+    def browser(self) -> Browser | None:
         return self._browser
 
     async def start(self) -> None:
@@ -32,11 +34,11 @@ class SharedBrowser:
         logger.info("[SharedBrowser] Starting Playwright and Browser...")
         try:
             self._playwright = await async_playwright().start()
-            
+
             launch_kwargs = {"headless": True}
             if not os.environ.get("PYTEST_CURRENT_TEST"):
                 launch_kwargs["args"] = ["--disable-blink-features=AutomationControlled"]
-                
+
             self._browser = await self._playwright.chromium.launch(**launch_kwargs)
             logger.info("[SharedBrowser] Browser started successfully.")
         except Exception as e:
@@ -63,7 +65,7 @@ class SharedBrowser:
             finally:
                 self._playwright = None
 
-    async def get_browser(self) -> Optional[Browser]:
+    async def get_browser(self) -> Browser | None:
         if self._browser is None:
             await self.start()
         return self._browser

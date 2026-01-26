@@ -20,11 +20,11 @@ from app.src.domain.user.models import User, user_keywords
 # 프로젝트의 공통 설정과 DB 세션을 가져옵니다
 from app.src.Infrastructure.crawling.crawlers import get_active_sites, get_crawler
 from app.src.Infrastructure.crawling.proxy_manager import ProxyManager
+from app.src.Infrastructure.crawling.shared_browser import SharedBrowser
 from app.src.Infrastructure.mail.mail_manager import (
     make_hotdeal_email_content,
     send_email,
 )
-from app.src.Infrastructure.crawling.shared_browser import SharedBrowser
 
 # User 모델을 사용하므로 _unused 튜플에서 제거하거나 주석 처리합니다.
 _unused = (user_keywords, MailLog)
