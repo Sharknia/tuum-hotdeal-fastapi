@@ -22,3 +22,8 @@ The deployment is fully automated via GitHub Actions:
 ## Commands
 - **Local Development**: `make dev` or `docker compose up`
 - **Manual Deployment**: N/A (Automated via GitHub Actions)
+
+## Verification Rule
+After completing tasks, ALWAYS run full tests and linter checks to ensure the deployment pipeline will pass:
+- Lint: `poetry run ruff check .`
+- Test: `poetry run pytest`
