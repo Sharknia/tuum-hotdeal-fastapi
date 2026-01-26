@@ -53,7 +53,7 @@ Each TODO includes verification to check file existence and content.
 
 ## TODOs
 
-- [ ] 1. Create `docs/CICD.md`
+- [x] 1. Create `docs/CICD.md`
   **What to do**:
   - Document the full pipeline:
     - **Lint/Test**: `poetry run ruff`, `poetry run pytest`
@@ -77,7 +77,7 @@ Each TODO includes verification to check file existence and content.
   - [ ] Mentions "Doppler" and "ARM64"
   - [ ] Notes the "Static Files" limitation
 
-- [ ] 2. Create `AGENT.md`
+- [x] 2. Create `AGENT.md`
   **What to do**:
   - Create a high-level summary for AI agents.
   - **CRITICAL**: The first line MUST be: `> **Always respond in Korean**`
@@ -104,6 +104,6 @@ Each TODO includes verification to check file existence and content.
 ## Success Criteria
 
 ### Final Checklist
-- [ ] `docs/CICD.md` exists and is detailed.
-- [ ] `AGENT.md` exists and is concise.
-- [ ] Known limitations (static files, arm64) are documented.
+- [x] `docs/CICD.md` exists and is detailed.
+- [x] `AGENT.md` exists and is concise.
+- [x] Known limitations (static files, arm64) are documented.
