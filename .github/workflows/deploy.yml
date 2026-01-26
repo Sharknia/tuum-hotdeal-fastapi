@@ -135,7 +135,7 @@ jobs:
 
   tag:
     name: Create Tag
-    needs: deploy
+    needs: [deploy, deploy-frontend]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -147,3 +147,32 @@ jobs:
           TAG_NAME="deploy-$(date +'%Y%m%d')-${GITHUB_SHA::7}"
           git tag $TAG_NAME
           git push origin $TAG_NAME
+
+  deploy-frontend:
+    name: Deploy Frontend
+    needs: [lint]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Doppler CLI
+        uses: dopplerhq/cli-action@v3
+
+      - name: Fetch Secrets from Doppler
+        uses: dopplerhq/secrets-fetch-action@v1.1.4
+        id: doppler
+        with:
+          doppler-token: ${{ secrets.DOPPLER_TOKEN }}
+          inject-env-vars: true
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ env.CLOUDFLARE_PAGES_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: tuum-hotdeal
+          directory: static
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
