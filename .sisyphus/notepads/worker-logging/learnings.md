@@ -1,0 +1,4 @@
+- Modified app/worker_main.py to implement worker execution logging.
+- Integrated WorkerLog model to track job status (RUNNING, SUCCESS, FAIL).
+- Added traceback capture for worker failures.
+- Implemented item count tracking for successful runs.

@@ -1,3 +1,4 @@
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr
@@ -24,6 +25,7 @@ class UserResponse(BaseModel):
     nickname: str
     is_active: bool
     auth_level: AuthLevel
+    created_at: datetime
 
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
