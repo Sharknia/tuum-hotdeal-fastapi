@@ -132,12 +132,11 @@
 
             keywords.forEach(kw => {
                 const tr = document.createElement('tr');
-                const date = new Date(kw.created_at).toLocaleDateString();
+                const date = new Date(kw.wdate).toLocaleDateString();
 
                 tr.innerHTML = `
                     <td>${kw.id}</td>
                     <td>${kw.title || kw.keyword}</td>
-                    <td>${kw.user_id}</td>
                     <td>${date}</td>
                     <td>
                         <button class="action-btn btn-delete" onclick="deleteKeyword(${kw.id})">삭제</button>
@@ -172,15 +171,15 @@
                 const tr = document.createElement('tr');
                 const date = new Date(log.run_at || log.created_at).toLocaleString();
                 let levelClass = '';
-                if (log.level === 'INFO') levelClass = 'log-level-info';
-                else if (log.level === 'WARN') levelClass = 'log-level-warn';
-                else if (log.level === 'ERROR') levelClass = 'log-level-error';
+                if (log.status === 'SUCCESS') levelClass = 'log-level-info';
+                else if (log.status === 'RUNNING') levelClass = 'log-level-warn';
+                else if (log.status === 'FAIL') levelClass = 'log-level-error';
 
                 tr.innerHTML = `
                     <td>${date}</td>
-                    <td><span class="status-badge ${levelClass}">${log.level}</span></td>
+                    <td><span class="status-badge ${levelClass}">${log.status}</span></td>
                     <td>${log.message}</td>
-                    <td>${log.source || '-'}</td>
+                    <td>${log.details || '-'}</td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -211,29 +210,6 @@
             alert('오류가 발생했습니다.');
         }
     };
-
-    window.deleteKeyword = async (keywordId) => {
-        if (!confirm('이 키워드를 정말 삭제하시겠습니까?')) return;
-
-        try {
-            const response = await fetchWithAuth(`/admin/keywords/${keywordId}`, {
-                method: 'DELETE'
-            });
-
-            if (response.ok) {
-                alert('키워드가 삭제되었습니다.');
-                loadKeywords(); // 목록 새로고침
-            } else {
-                const error = await response.text();
-                alert('삭제 실패: ' + error);
-            }
-        } catch (error) {
-            console.error(error);
-            alert('오류가 발생했습니다.');
-        }
-    };
-
-})();
 
     window.deleteKeyword = async (keywordId) => {
         if (!confirm('이 키워드를 정말 삭제하시겠습니까?')) return;

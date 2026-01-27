@@ -74,10 +74,7 @@ async def register_keyword(
         send_email(subject=subject, to=user.email, body=body, is_html=True)
     )
 
-    return KeywordResponse(
-        id=keyword.id,
-        title=keyword.title,
-    )
+    return KeywordResponse.model_validate(keyword)
 
 
 async def unlink_keyword(
@@ -105,4 +102,4 @@ async def view_users_keywords(
 ) -> list[KeywordResponse]:
     # 유저의 키워드 리스트 조회
     keywords: list[Keyword] = await select_users_keywords(db, user_id)
-    return [KeywordResponse(id=keyword.id, title=keyword.title) for keyword in keywords]
+    return [KeywordResponse.model_validate(keyword) for keyword in keywords]

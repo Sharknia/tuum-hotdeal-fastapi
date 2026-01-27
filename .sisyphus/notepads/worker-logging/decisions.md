@@ -1,0 +1,2 @@
+- Decided to wrap the entire job() logic in a try...except...finally block to ensure that all unhandled exceptions are caught and logged to the database.
+- Used a separate session for logging to avoid issues with the main job session if it fails.
