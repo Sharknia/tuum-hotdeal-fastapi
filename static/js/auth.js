@@ -248,10 +248,15 @@ async function logout() {
  * @param {Object} [userInfo] - 이미 로드된 사용자 정보가 있다면 전달
  */
 async function showAdminLinkIfPermitted(userInfo = null) {
+    console.log("[DEBUG] Checking Admin Link Permission. UserInfo:", userInfo);
     if (!userInfo) {
         userInfo = await getUserInfo();
     }
     
+    if (userInfo) {
+        console.log("[DEBUG] Auth Level:", userInfo.auth_level, "Type:", typeof userInfo.auth_level);
+    }
+
     if (userInfo && userInfo.auth_level >= 9) {
         const adminLink = document.getElementById('admin-link');
         if (adminLink) {

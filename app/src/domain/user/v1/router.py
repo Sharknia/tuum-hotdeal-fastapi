@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.src.core.dependencies.auth import authenticate_refresh_token, registered_user
 from app.src.core.dependencies.db_session import get_db
 from app.src.core.exceptions.auth_excptions import AuthErrors
+from app.src.core.logger import logger
 from app.src.domain.user.schemas import (
     AuthenticatedUser,
     LoginResponse,
@@ -162,4 +163,5 @@ async def get_me(
         db=db,
         user_id=login_user.user_id,
     )
+    logger.info(f"[DEBUG] /me response: {result.model_dump_json()}")
     return result
