@@ -5,7 +5,7 @@ let siteList = [];
 
 async function loadSites() {
     try {
-        const response = await fetch('/api/hotdeal/v1/sites');
+        const response = await fetch(`${API_URL}/hotdeal/v1/sites`);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }

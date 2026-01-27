@@ -11,8 +11,8 @@ function getApiUrl() {
     } else if (hostname.includes('dev.')) {
         return 'https://dev-api.tuum.day/api';
     } else {
-        // 프로덕션: 같은 도메인에서 API 서빙 (CORS 불필요)
-        return '/api';
+        // 프로덕션: 별도 API 도메인 사용
+        return 'https://hotdeal-api.tuum.day/api';
     }
 }
 

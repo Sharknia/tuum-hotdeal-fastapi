@@ -1,4 +1,3 @@
-import { checkLoginStatus, getUserInfo, logout } from './js/auth_utils.js';
 
 const chatbox = document.getElementById('chatbox');
 const messageInput = document.getElementById('message');
@@ -93,7 +92,7 @@ window.addEventListener('click', (event) => {
 // TODO: WebSocket 연결 및 서버로부터 메시지 수신 로직 추가
 function connectWebSocket() {
     // WebSocket 주소는 FastAPI 서버 설정에 맞게 조정해야 합니다.
-    const wsUrl = `ws://${window.location.host}/ws`;
+    const wsUrl = 'wss://hotdeal-api.tuum.day/ws';
     ws = new WebSocket(wsUrl);
 
     ws.onopen = function (event) {
@@ -156,8 +155,10 @@ console.log('WebSocket connection logic to be added here.'); // 임시 로그
 // 페이지 초기화
 async function init() {
     // 로그인 체크
-    const needLogin = await checkLoginStatus();
-    if (needLogin) return;
+    if (!hasValidTokens()) {
+        window.location.href = '/login';
+        return;
+    }
 
     // 사용자 정보 표시
     const userInfo = await getUserInfo();
