@@ -163,5 +163,8 @@ async def get_me(
         db=db,
         user_id=login_user.user_id,
     )
-    logger.info(f"[DEBUG] /me response: {result.model_dump_json()}")
+    try:
+        logger.info(f"[DEBUG] /me response: {result.model_dump_json()}")
+    except Exception as e:
+        logger.error(f"Failed to log /me response: {e}")
     return result

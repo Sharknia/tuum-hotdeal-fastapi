@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 from app.src.domain.user.enums import AuthLevel
 
@@ -25,8 +25,7 @@ class UserResponse(BaseModel):
     is_active: bool
     auth_level: AuthLevel
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
 
 # 로그인 응답 스키마
