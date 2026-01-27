@@ -1,3 +1,4 @@
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import Response
@@ -78,6 +79,12 @@ async def login_user(
         user_id=user.id,
         email=user.email,
     )
+
+    # 마지막 로그인 시간 업데이트
+    user.last_login = datetime.now()
+    db.add(user)
+    await db.commit()
+
     return LoginResponse(
         access_token=await create_access_token(
             user.id, user.email, user.nickname, user.auth_level
