@@ -26,7 +26,10 @@ class TestMultiAnchor:
     @pytest.mark.asyncio
     async def test_legacy_single_id(self):
         """stored="100", fetched=["100"], expected=[]"""
-        session = AsyncMock()
+        session = MagicMock()
+        session.execute = AsyncMock()
+        session.commit = AsyncMock()
+        session.add = MagicMock()
         keyword = MagicMock(spec=Keyword)
         keyword.id = 1
         keyword.title = "test"
@@ -50,7 +53,10 @@ class TestMultiAnchor:
     @pytest.mark.asyncio
     async def test_multi_anchor_normal(self):
         """stored="100,99,98", fetched=["100"], expected=[]"""
-        session = AsyncMock()
+        session = MagicMock()
+        session.execute = AsyncMock()
+        session.commit = AsyncMock()
+        session.add = MagicMock()
         keyword = MagicMock(spec=Keyword)
         keyword.id = 1
         keyword.title = "test"
@@ -74,7 +80,10 @@ class TestMultiAnchor:
     @pytest.mark.asyncio
     async def test_multi_anchor_new(self):
         """stored="100,99,98", fetched=["101","100"], expected=["101"]"""
-        session = AsyncMock()
+        session = MagicMock()
+        session.execute = AsyncMock()
+        session.commit = AsyncMock()
+        session.add = MagicMock()
         keyword = MagicMock(spec=Keyword)
         keyword.id = 1
         keyword.title = "test"
@@ -174,7 +183,10 @@ class TestMultiAnchor:
     @pytest.mark.asyncio
     async def test_multi_anchor_save_format(self):
         """Verify DB update calls session.add with CSV "id1,id2,id3"."""
-        session = AsyncMock()
+        session = MagicMock()
+        session.execute = AsyncMock()
+        session.commit = AsyncMock()
+        session.add = MagicMock()
         keyword = MagicMock(spec=Keyword)
         keyword.id = 1
         keyword.title = "test"

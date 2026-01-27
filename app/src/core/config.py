@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -28,16 +28,17 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = "hotdeal1234"
     SMTP_FROM: str = "hotdeal@tuum.day"
 
-    class Config:
+    model_config = SettingsConfigDict(
         # .env 파일 경로 명시 (기본값은 프로젝트 루트의 .env)
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+        env_file=".env",
+        env_file_encoding="utf-8",
         # 환경 변수 이름에 접두사 추가 방지 (선택 사항)
-        # env_prefix = "APP_"
+        # env_prefix="APP_",
         # 대소문자 구분 (기본값 False)
-        case_sensitive = False
+        case_sensitive=False,
         # 클래스에 정의되지 않은 .env 변수 무시
-        extra = "ignore"
+        extra="ignore",
+    )
 
 
 # 설정 인스턴스 생성 (이 시점에 .env 파일 로드 시도)
