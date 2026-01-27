@@ -1,12 +1,13 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.src.core.dependencies.auth import authenticate_refresh_token, registered_user
 from app.src.core.dependencies.db_session import get_db
 from app.src.core.exceptions.auth_excptions import AuthErrors
 from app.src.core.logger import logger
+from app.src.domain.user.repositories import get_all_admins
 from app.src.domain.user.schemas import (
     AuthenticatedUser,
     LoginResponse,
@@ -21,6 +22,7 @@ from app.src.domain.user.services import (
     login_user,
     logout_user,
     refresh_access_token,
+    send_new_user_notifications,
 )
 from app.src.utils.swsagger_helper import create_responses
 
@@ -39,6 +41,7 @@ router = APIRouter(prefix="/v1", tags=["user"])
 async def signup(
     request: UserCreateRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
+    background_tasks: BackgroundTasks,
 ) -> UserResponse:
     """
     새로운 사용자를 등록합니다.
@@ -53,6 +56,11 @@ async def signup(
         nickname=request.nickname,
         password=request.password,
     )
+
+    admins = await get_all_admins(db)
+    if admins:
+        background_tasks.add_task(send_new_user_notifications, admins, new_user)
+
     return new_user
 
 
