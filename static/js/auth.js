@@ -242,3 +242,20 @@ async function logout() {
         return false;
     }
 }
+
+/**
+ * 관리자 권한을 확인하고 관리자 링크를 표시하는 함수
+ * @param {Object} [userInfo] - 이미 로드된 사용자 정보가 있다면 전달
+ */
+async function showAdminLinkIfPermitted(userInfo = null) {
+    if (!userInfo) {
+        userInfo = await getUserInfo();
+    }
+    
+    if (userInfo && userInfo.auth_level >= 9) {
+        const adminLink = document.getElementById('admin-link');
+        if (adminLink) {
+            adminLink.style.display = 'inline-flex'; // nav-button uses inline-flex
+        }
+    }
+}
