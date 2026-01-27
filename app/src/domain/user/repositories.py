@@ -2,6 +2,7 @@ from uuid import UUID
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from .enums import AuthLevel
 from .models import User
@@ -73,6 +74,36 @@ async def activate_user(
         await db.commit()
         return result.scalar_one_or_none()
     return user
+
+
+async def deactivate_user(
+    db: AsyncSession,
+    user_id: UUID,
+) -> User | None:
+    """사용자를 비활성화합니다 (is_active = False)."""
+    user = await get_user_by_id(db, user_id)
+    if user and user.is_active:
+        stmt = (
+            update(User)
+            .where(User.id == user_id)
+            .values(is_active=False)
+            .returning(User)
+        )
+        result = await db.execute(stmt)
+        await db.commit()
+        return result.scalar_one_or_none()
+    return user
+
+
+async def get_user_with_keywords(
+    db: AsyncSession,
+    user_id: UUID,
+) -> User | None:
+    """사용자와 해당 사용자의 키워드 목록을 함께 조회합니다."""
+    result = await db.execute(
+        select(User).filter(User.id == user_id).options(selectinload(User.keywords))
+    )
+    return result.scalar_one_or_none()
 
 
 async def update_user_auth_level(
