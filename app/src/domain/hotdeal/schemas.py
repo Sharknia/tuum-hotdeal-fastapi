@@ -1,4 +1,5 @@
-from pydantic import BaseModel
+from datetime import datetime
+from pydantic import BaseModel, ConfigDict
 
 from app.src.domain.hotdeal.enums import SiteName
 
@@ -20,6 +21,9 @@ class KeywordCreateRequest(BaseModel):
 class KeywordResponse(BaseModel):
     id: int
     title: str
+    wdate: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SiteInfo(BaseModel):

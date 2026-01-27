@@ -1,4 +1,5 @@
 import pytest
+from datetime import datetime
 from fastapi import Response
 
 from app.src.core.exceptions.client_exceptions import ClientErrors
@@ -59,7 +60,7 @@ async def test_post_keyword(
     else:
         mocker.patch(
             "app.src.domain.hotdeal.v1.router.register_keyword",
-            return_value=KeywordResponse(id=1, title="keyword"),
+            return_value=KeywordResponse(id=1, title="keyword", wdate=datetime.now()),
         )
 
     # API 호출
@@ -69,7 +70,10 @@ async def test_post_keyword(
     assert response.status_code == expected_status
 
     if expected_response:
-        assert response.json() == expected_response
+        response_data = response.json()
+        if isinstance(response_data, dict) and "wdate" in response_data:
+            del response_data["wdate"]
+        assert response_data == expected_response
     else:
         response_data = response.json()
         assert response_data["title"] == "keyword"
@@ -143,14 +147,18 @@ async def test_get_my_keywords_list(
 
     mocker.patch(
         "app.src.domain.hotdeal.v1.router.view_users_keywords",
-        return_value=[KeywordResponse(id=1, title="keyword")],
+        return_value=[KeywordResponse(id=1, title="keyword", wdate=datetime.now())],
     )
     # API 호출
     response: Response = mock_client.get("/api/hotdeal/v1/keywords")
 
     # 응답 검증
     assert response.status_code == 200
-    assert response.json() == [
+    response_data = response.json()
+    for item in response_data:
+        if "wdate" in item:
+            del item["wdate"]
+    assert response_data == [
         {"id": 1, "title": "keyword"},
     ]
 
