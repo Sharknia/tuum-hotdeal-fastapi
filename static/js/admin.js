@@ -95,14 +95,28 @@
                 // 가입일 포맷팅
                 const joinDate = new Date(user.created_at).toLocaleDateString();
 
+                // 최근 접속일 포맷팅
+                const lastLogin = user.last_login 
+                    ? new Date(user.last_login).toLocaleString('ko-KR') 
+                    : '-';
+
+                // 버튼 로직
+                let actionBtn;
+                if (user.is_active) {
+                    actionBtn = `<button class="action-btn btn-delete" onclick="unapproveUser(${user.id})">승인 해제</button>`;
+                } else {
+                    actionBtn = `<button class="action-btn btn-approve" onclick="approveUser(${user.id})">승인</button>`;
+                }
+
                 tr.innerHTML = `
                     <td>${user.id}</td>
                     <td>${user.email}</td>
-                    <td>${user.nickname}</td>
+                    <td><a href="admin_user_detail.html?id=${user.id}" style="text-decoration: underline; color: inherit;">${user.nickname}</a></td>
                     <td>${roleBadge}</td>
+                    <td>${lastLogin}</td>
                     <td>${joinDate}</td>
                     <td>
-                        <button class="action-btn btn-approve" onclick="approveUser(${user.id})">승인</button>
+                        ${actionBtn}
                     </td>
                 `;
                 tbody.appendChild(tr);
@@ -225,6 +239,27 @@
             } else {
                 const error = await response.text();
                 alert('삭제 실패: ' + error);
+            }
+        } catch (error) {
+            console.error(error);
+            alert('오류가 발생했습니다.');
+        }
+    };
+
+    window.unapproveUser = async (userId) => {
+        if (!confirm('이 사용자의 승인을 해제하시겠습니까?')) return;
+        
+        try {
+            const response = await fetchWithAuth(`/admin/users/${userId}/unapprove`, {
+                method: 'PATCH'
+            });
+            
+            if (response.ok) {
+                alert('사용자 승인이 해제되었습니다.');
+                loadUsers(); // 목록 새로고침
+            } else {
+                const error = await response.text();
+                alert('승인 해제 실패: ' + error);
             }
         } catch (error) {
             console.error(error);

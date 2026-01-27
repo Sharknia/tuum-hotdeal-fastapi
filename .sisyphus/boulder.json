@@ -1,6 +1,9 @@
 {
-  "active_plan": "/home/ubuntu/dev/tuum-hotdeal-fastapi/.sisyphus/plans/fix-admin-dashboard.md",
-  "started_at": "2026-01-27T07:42:15.671Z",
-  "session_ids": ["ses_401a05c65ffe12QVUYOUEDVsxR"],
-  "plan_name": "fix-admin-dashboard"
+  "active_plan": "/home/ubuntu/dev/tuum-hotdeal-fastapi/.sisyphus/plans/fix-admin-tabs.md",
+  "started_at": "2026-01-27T08:35:00.000Z",
+  "session_ids": [
+    "ses_40173f74effexlZSIcGb07FKGf",
+    "ses_4014c1b87ffeYSh9C3AM2OTcfS"
+  ],
+  "plan_name": "fix-admin-tabs"
 }

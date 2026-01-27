@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ko">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>사용자 상세 정보 - tuum.day Admin</title>
+        <link rel="stylesheet" href="./style.css" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+        <style>
+            /* Admin User Detail Specific Styles */
+            .detail-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: var(--spacing-xl);
+            }
+            .detail-section {
+                background: var(--container-bg);
+                padding: var(--spacing-xl);
+                border-radius: var(--border-radius-md);
+                box-shadow: 0 2px 4px var(--shadow-color);
+                margin-bottom: var(--spacing-xl);
+            }
+            .info-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                gap: var(--spacing-lg);
+            }
+            .info-item {
+                display: flex;
+                flex-direction: column;
+            }
+            .info-label {
+                font-weight: 600;
+                color: var(--text-muted-color);
+                font-size: var(--font-size-sm);
+                margin-bottom: 4px;
+            }
+            .info-value {
+                font-size: var(--font-size-base);
+                color: var(--text-dark-color);
+            }
+        </style>
+    </head>
+    <body class="hotdeal-page">
+        <nav class="main-nav">
+            <div class="nav-content">
+                <div class="nav-left">
+                    <img
+                        src="https://ktlnpawucfuxjbufkplf.supabase.co/storage/v1/object/public/pb//tuum.png"
+                        alt="tuum.day 로고"
+                        class="nav-logo"
+                    />
+                    <h1>tuum.day <span style="font-size: 0.6em; color: var(--text-muted-color); font-weight: normal;">Admin</span></h1>
+                </div>
+                <div class="nav-right">
+                    <a href="/admin.html" class="nav-button search-link-button"><i class="fas fa-arrow-left"></i> 돌아가기</a>
+                    <span id="user-nickname"></span>
+                    <button id="logout-button" class="nav-button"><i class="fas fa-sign-out-alt"></i> 로그아웃</button>
+                </div>
+            </div>
+        </nav>
+
+        <main class="admin-container">
+            <div class="detail-header">
+                <h2><i class="fas fa-user"></i> 사용자 상세 정보</h2>
+            </div>
+
+            <!-- 사용자 정보 섹션 -->
+            <section class="detail-section">
+                <h3>기본 정보</h3>
+                <div id="user-info-container" class="info-grid">
+                    <div class="info-item">
+                        <span class="info-label">ID</span>
+                        <span class="info-value" id="user-id">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">이메일</span>
+                        <span class="info-value" id="user-email">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">닉네임</span>
+                        <span class="info-value" id="user-nickname-display">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">권한</span>
+                        <span class="info-value" id="user-role">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">최근 접속</span>
+                        <span class="info-value" id="user-last-login">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">상태</span>
+                        <span class="info-value" id="user-status">-</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 키워드 섹션 -->
+            <section class="detail-section">
+                <h3><i class="fas fa-tags"></i> 등록된 키워드</h3>
+                <div class="admin-table-container">
+                    <table class="admin-table" id="user-keywords-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>키워드</th>
+                                <th>사이트</th>
+                                <th>등록일</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- JS로 로드됨 -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+
+        <script src="./js/auth.js"></script>
+        <script src="./js/admin_user_detail.js"></script>
+    </body>
+</html>
