@@ -65,7 +65,8 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
-    needs: lint
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' && needs.changes.outputs.frontend != 'true' }}
     env:
       DATABASE_URL: "sqlite+aiosqlite:///:memory:"
       REFRESH_TOKEN_SECRET_KEY: test-refresh-secret-key
@@ -161,8 +162,43 @@ jobs:
           ssh ${SSH_USER}@${SSH_HOST} << EOF
             cd ${DEPLOY_PATH}
             export DOPPLER_TOKEN=${DOPPLER_TOKEN}
+            SERVICE_NAME="tuum-hotdeal-api"
+            IMAGE_NAME="ghcr.io/sharknia/tuum-hotdeal-fastapi:latest"
+            PREV_IMAGE_ID=""
+            if docker inspect \${SERVICE_NAME} >/dev/null 2>&1; then
+              PREV_IMAGE_ID=\$(docker inspect --format='{{.Image}}' \${SERVICE_NAME})
+            fi
             docker compose -f docker-compose.prod.yml pull
             docker compose -f docker-compose.prod.yml up -d --force-recreate
+            MAX_RETRIES=20
+            SLEEP_SECONDS=5
+            STATUS=""
+            for i in \$(seq 1 \${MAX_RETRIES}); do
+              STATUS=\$(docker inspect --format='{{.State.Health.Status}}' \${SERVICE_NAME} 2>/dev/null || true)
+              if [ "\${STATUS}" = "healthy" ]; then
+                echo "Healthcheck OK (\${SERVICE_NAME})"
+                break
+              fi
+              if [ "\${STATUS}" = "unhealthy" ]; then
+                echo "Healthcheck FAILED (\${SERVICE_NAME})"
+                break
+              fi
+              echo "Waiting for healthcheck... (\${i}/\${MAX_RETRIES})"
+              sleep \${SLEEP_SECONDS}
+            done
+
+            if [ "\${STATUS}" != "healthy" ]; then
+              echo "Deploy failed: healthcheck did not pass."
+              if [ -n "\${PREV_IMAGE_ID}" ]; then
+                echo "Rolling back to previous image: \${PREV_IMAGE_ID}"
+                docker tag "\${PREV_IMAGE_ID}" "\${IMAGE_NAME}"
+                docker compose -f docker-compose.prod.yml up -d --force-recreate
+              else
+                echo "No previous image found; rollback skipped."
+              fi
+              exit 1
+            fi
+
             docker image prune -f
           EOF
 
