@@ -12,6 +12,10 @@ class UserListResponse(BaseModel):
     total: int
 
 
+class UserDetailResponse(UserResponse):
+    keywords: list[KeywordResponse]
+
+
 class WorkerLogResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

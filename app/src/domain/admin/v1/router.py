@@ -10,11 +10,17 @@ from app.src.core.exceptions.auth_excptions import AuthErrors
 from app.src.domain.admin.repositories import get_all_worker_logs
 from app.src.domain.admin.schemas import (
     KeywordListResponse,
+    UserDetailResponse,
     UserListResponse,
     WorkerLogListResponse,
 )
 from app.src.domain.hotdeal.repositories import delete_keyword, get_all_keywords
-from app.src.domain.user.repositories import activate_user, get_all_users
+from app.src.domain.user.repositories import (
+    activate_user,
+    deactivate_user,
+    get_all_users,
+    get_user_with_keywords,
+)
 from app.src.domain.user.schemas import AuthenticatedUser, UserResponse
 from app.worker_main import job
 
@@ -42,6 +48,32 @@ async def approve_user(
     _: Annotated[AuthenticatedUser, Depends(authenticate_admin_user)],
 ):
     user = await activate_user(db, user_id)
+    if not user:
+        raise AuthErrors.USER_NOT_FOUND
+    return user
+
+
+@router.patch(
+    "/users/{user_id}/unapprove", response_model=UserResponse, summary="사용자 승인 해제"
+)
+async def unapprove_user(
+    user_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[AuthenticatedUser, Depends(authenticate_admin_user)],
+):
+    user = await deactivate_user(db, user_id)
+    if not user:
+        raise AuthErrors.USER_NOT_FOUND
+    return user
+
+
+@router.get("/users/{user_id}", response_model=UserDetailResponse, summary="사용자 상세 조회")
+async def get_user_detail(
+    user_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[AuthenticatedUser, Depends(authenticate_admin_user)],
+):
+    user = await get_user_with_keywords(db, user_id)
     if not user:
         raise AuthErrors.USER_NOT_FOUND
     return user
