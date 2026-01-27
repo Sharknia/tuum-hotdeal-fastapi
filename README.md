@@ -140,34 +140,28 @@ poetry run python -m app.worker_main
 
 ### 개요
 
-`main` 브랜치에 push되면 GitHub Actions가 자동으로 테스트, 빌드, 배포를 수행합니다.
+`main` 브랜치에 push되면 GitHub Actions가 자동으로 백엔드와 프론트엔드를 분리하여 배포를 수행합니다.
 
-```
-Push to main → Test → Build → Deploy → Tag
-```
+- **Backend (API)**: Docker 이미지를 빌드하여 GHCR에 푸시한 뒤, SSH를 통해 VPS 서버에서 컨테이너를 갱신합니다.
+- **Frontend (Static)**: `static/` 디렉토리의 정적 파일을 Cloudflare Pages를 통해 글로벌 CDN으로 배포합니다.
 
 ### 파이프라인 단계
 
-| 단계 | 설명 |
-|------|------|
-| **Test** | Ruff 린트 + Pytest 테스트 실행 |
-| **Build** | Docker 이미지 빌드 → GHCR에 푸시 |
-| **Deploy** | SSH로 서버 접속 → 이미지 pull → 컨테이너 재시작 |
-| **Tag** | `deploy-YYYYMMDD-SHA` 형식의 배포 태그 생성 |
+| 대상 | 단계 | 설명 |
+|------|------|------|
+| **공통** | **Lint & Test** | Ruff 린트 및 Pytest 실행 |
+| **Backend** | **Build** | Docker 이미지 빌드 → GHCR 푸시 (`linux/arm64`) |
+| **Backend** | **Deploy** | SSH 접속 → `docker compose pull` & 재시작 |
+| **Frontend** | **Deploy** | Cloudflare Pages Action을 이용한 `static/` 배포 |
+| **공통** | **Tag** | 배포 성공 시 `deploy-YYYYMMDD-SHA` 태그 생성 |
 
 ### 시크릿 관리 (Doppler)
 
-환경변수는 [Doppler](https://doppler.com)를 통해 관리됩니다. 서버에 `.env` 파일을 두지 않고, 컨테이너 실행 시 Doppler CLI가 런타임에 환경변수를 주입합니다.
+환경변수는 [Doppler](https://doppler.com)를 통해 중앙 집중식으로 관리됩니다.
+- **Backend**: 컨테이너 실행 시 Doppler CLI가 런타임에 환경변수를 주입합니다.
+- **Frontend**: GitHub Actions 워크플로우에서 Cloudflare 배포에 필요한 토큰을 Doppler로부터 가져와 사용합니다.
 
-```dockerfile
-ENTRYPOINT ["doppler", "run", "--"]
-CMD ["uvicorn", "app.main:app", ...]
-```
-
-**장점:**
-- 서버에 시크릿 파일이 존재하지 않음
-- 중앙 집중식 환경변수 관리
-- 환경변수 변경 시 컨테이너 재시작만으로 반영
+자세한 아키텍처는 [docs/CICD.md](./docs/CICD.md)를 참조하세요.
 
 ### 배포 환경
 
