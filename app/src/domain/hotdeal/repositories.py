@@ -106,6 +106,16 @@ async def delete_keyword(
     await db.commit()
 
 
+# 모든 키워드 조회 (관리자용)
+async def get_all_keywords(
+    db: AsyncSession,
+    skip: int = 0,
+    limit: int = 100,
+) -> list[Keyword]:
+    result = await db.execute(select(Keyword).offset(skip).limit(limit))
+    return list(result.scalars().all())
+
+
 # 유저의 키워드 리스트 조회 (이름으로 정렬)
 async def select_users_keywords(
     db: AsyncSession,
