@@ -9,6 +9,15 @@
 - **Backend**: Docker 기반의 컨테이너 환경으로 빌드되어 VPS(Virtual Private Server)에 배포됩니다.
 - **Frontend**: Cloudflare Pages를 통해 글로벌 CDN 환경으로 배포됩니다.
 
+### 변경 경로 기반 조건부 배포
+본 저장소는 변경 경로를 기준으로 배포 여부를 결정합니다. 백엔드 또는 프론트엔드 변경에 해당하는 경우에만 배포가 실행되며, 그 외 변경은 전부 **Non Deploy**입니다.
+
+- **우선순위**: `Frontend 변경` → `Backend 변경` → `Non Deploy`
+- **Frontend 변경**: `static/**`
+- **Backend 변경**: `app/**`, `alembic/**`, `tests/**`, `pyproject.toml`, `poetry.lock`, `Dockerfile`, `docker-compose*.yml`, `entrypoint.sh`, `Makefile`, `alembic.ini`, `pyrightconfig.json`, `pytest.ini`
+- **Non Deploy**: 위 경로에 해당하지 않는 모든 변경(예: `.agent/**`, `.opencode/**`, `docs/**`, `README.md`, `.gitignore`, `.github/**`)
+- **태깅**: 배포가 수행된 경우에만 태깅됩니다.
+
 ### 배포 분리 이유 (Why Split?)
 1. **성능 및 CDN 활용**: 프론트엔드 정적 파일을 Cloudflare의 글로벌 CDN을 통해 서빙함으로써 전 세계 사용자에게 빠른 응답 속도를 제공합니다.
 2. **백엔드 부하 감소**: FastAPI 서버가 정적 파일을 직접 서빙하지 않도록 분리하여 API 처리 성능을 향상시켰습니다.
