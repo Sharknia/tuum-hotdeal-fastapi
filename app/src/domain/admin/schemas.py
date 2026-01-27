@@ -1,8 +1,11 @@
 from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict
-from app.src.domain.user.schemas import UserResponse
-from app.src.domain.hotdeal.schemas import KeywordResponse
+
 from app.src.domain.admin.models import WorkerStatus
+from app.src.domain.hotdeal.schemas import KeywordResponse
+from app.src.domain.user.schemas import UserResponse
+
 
 class UserListResponse(BaseModel):
     items: list[UserResponse]

@@ -1,20 +1,21 @@
 from typing import Annotated
 from uuid import UUID
+
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.src.core.dependencies.auth import authenticate_admin_user
 from app.src.core.dependencies.db_session import get_db
 from app.src.core.exceptions.auth_excptions import AuthErrors
-from app.src.domain.user.repositories import get_all_users, activate_user
-from app.src.domain.hotdeal.repositories import get_all_keywords, delete_keyword
 from app.src.domain.admin.repositories import get_all_worker_logs
-from app.src.domain.user.schemas import AuthenticatedUser, UserResponse
 from app.src.domain.admin.schemas import (
-    UserListResponse,
     KeywordListResponse,
+    UserListResponse,
     WorkerLogListResponse,
 )
+from app.src.domain.hotdeal.repositories import delete_keyword, get_all_keywords
+from app.src.domain.user.repositories import activate_user, get_all_users
+from app.src.domain.user.schemas import AuthenticatedUser, UserResponse
 from app.worker_main import job
 
 router = APIRouter(

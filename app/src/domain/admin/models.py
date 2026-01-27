@@ -1,7 +1,10 @@
-from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime, Enum
-from app.src.core.database import Base
 import enum
+from datetime import datetime
+
+from sqlalchemy import Column, DateTime, Enum, Integer, Text
+
+from app.src.core.database import Base
+
 
 class WorkerStatus(enum.Enum):
     SUCCESS = "SUCCESS"
@@ -10,7 +13,7 @@ class WorkerStatus(enum.Enum):
 
 class WorkerLog(Base):
     __tablename__ = "worker_logs"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     run_at = Column(DateTime, default=datetime.now, nullable=False)
     status = Column(Enum(WorkerStatus), nullable=False)
