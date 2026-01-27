@@ -11,22 +11,32 @@
     "agents": {
         // 원본 기본값: anthropic/claude-opus-4-5 (variant: max)
         "sisyphus": {
-            "model": "zai-coding-plan/glm-4.7",
+            "model": "google/antigravity-gemini-3-flash",
         },
 
         // 원본 기본값: zai-coding-plan/glm-4.7
         "librarian": {
-            "model": "zai-coding-plan/glm-4.7",
+            "model": "google/antigravity-gemini-3-flash",
         },
 
         // 원본 기본값: anthropic/claude-haiku-4-5
         "explore": {
-            "model": "zai-coding-plan/glm-4.7",
+            "model": "google/antigravity-gemini-3-flash",
         },
 
         // 원본 기본값: openai/gpt-5.2 (variant: high)
         "oracle": {
-            "model": "google/antigravity-claude-opus-4-5-thinking",
+            "model": "google/antigravity-gemini-3-pro-high",
+        },
+
+        // 원본 기본값: (커스텀 에이전트)
+        "frontend-ui-ux-engineer": {
+            "model": "google/antigravity-gemini-3-pro-high",
+        },
+
+        // 원본 기본값: (커스텀 에이전트)
+        "document-writer": {
+            "model": "google/antigravity-gemini-3-flash",
         },
 
         // 원본 기본값: google/gemini-3-flash
@@ -36,22 +46,22 @@
 
         // 원본 기본값: anthropic/claude-opus-4-5 (variant: max)
         "prometheus": {
-            "model": "google/antigravity-claude-opus-4-5-thinking",
+            "model": "google/antigravity-gemini-3-pro-high",
         },
 
         // 원본 기본값: anthropic/claude-opus-4-5 (variant: max)
         "metis": {
-            "model": "google/antigravity-claude-opus-4-5-thinking",
+            "model": "google/antigravity-gemini-3-pro-high",
         },
 
         // 원본 기본값: openai/gpt-5.2 (variant: medium)
         "momus": {
-            "model": "google/antigravity-claude-opus-4-5-thinking",
+            "model": "google/antigravity-gemini-3-pro-high",
         },
 
         // 원본 기본값: anthropic/claude-sonnet-4-5
         "atlas": {
-            "model": "zai-coding-plan/glm-4.7",
+            "model": "google/antigravity-gemini-3-pro-high",
         },
     },
 
@@ -68,7 +78,7 @@
         // 원본 기본값: openai/gpt-5.2-codex (variant: xhigh)
         // 용도: Deep logical reasoning, complex architecture decisions
         "ultrabrain": {
-            "model": "google/antigravity-claude-opus-4-5-thinking",
+            "model": "google/antigravity-gemini-3-pro-high",
             "variant": "xhigh",
         },
 
@@ -82,19 +92,19 @@
         // 원본 기본값: anthropic/claude-haiku-4-5
         // 용도: Small/quick tasks, minimal overhead
         "quick": {
-            "model": "zai-coding-plan/glm-4.7",
+            "model": "google/antigravity-gemini-3-flash",
         },
 
         // 원본 기본값: anthropic/claude-sonnet-4-5
         // 용도: Moderate effort tasks that don't fit specific categories
         "unspecified-low": {
-            "model": "zai-coding-plan/glm-4.7",
+            "model": "google/antigravity-gemini-3-flash",
         },
 
         // 원본 기본값: anthropic/claude-opus-4-5 (variant: max)
         // 용도: Substantial effort across multiple systems/modules
         "unspecified-high": {
-            "model": "google/antigravity-claude-opus-4-5-thinking",
+            "model": "google/antigravity-gemini-3-pro-high",
             "variant": "max",
         },
 
