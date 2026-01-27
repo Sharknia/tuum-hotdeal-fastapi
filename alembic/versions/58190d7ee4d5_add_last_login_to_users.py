@@ -1,7 +1,7 @@
 """add_last_login_to_users
 
 Revision ID: 58190d7ee4d5
-Revises: 2cc22413adda
+Revises: ba0fb53dce89
 Create Date: 2026-01-27 10:16:13.610455
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '58190d7ee4d5'
-down_revision: Union[str, None] = '2cc22413adda'
+down_revision: Union[str, None] = 'ba0fb53dce89'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
