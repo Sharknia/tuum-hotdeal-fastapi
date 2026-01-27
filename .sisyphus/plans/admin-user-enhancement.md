@@ -99,7 +99,7 @@ Implement full lifecycle user management in the admin panel, including activity 
     - **Acceptance Criteria**:
         - [ ] API documentation (Swagger) shows `last_login` in User response.
 
-- [ ] 3. **Implement Last Login Logic**
+- [x] 3. **Implement Last Login Logic**
     - **What to do**:
         - In `app/src/domain/user/services.py` -> `login_user` function.
         - After successful password check, update `user.last_login = datetime.now()`.
@@ -110,7 +110,7 @@ Implement full lifecycle user management in the admin panel, including activity 
         - [ ] Login via `/api/user/v1/login`.
         - [ ] DB check shows updated timestamp.
 
-- [ ] 4. **Implement Admin API: Unapprove & Detail**
+- [x] 4. **Implement Admin API: Unapprove & Detail**
     - **What to do**:
         - In `app/src/domain/admin/v1/router.py`:
         - Add `PATCH /users/{user_id}/unapprove`:
@@ -127,7 +127,7 @@ Implement full lifecycle user management in the admin panel, including activity 
         - [ ] `curl -X PATCH .../unapprove` deactivates user.
         - [ ] `curl .../users/{id}` returns user + keywords.
 
-- [ ] 5. **Frontend: Admin List Update**
+- [x] 5. **Frontend: Admin List Update**
     - **What to do**:
         - Update `static/admin.html`: Add table header `<th>최근 접속</th>`.
         - Update `static/js/admin.js`:
@@ -143,7 +143,7 @@ Implement full lifecycle user management in the admin panel, including activity 
         - [ ] Unapprove button works.
         - [ ] Clicking nickname opens detail page.
 
-- [ ] 6. **Frontend: Create User Detail Page**
+- [x] 6. **Frontend: Create User Detail Page**
     - **What to do**:
         - Create `static/admin_user_detail.html`:
             - Basic layout (navbar, container).
