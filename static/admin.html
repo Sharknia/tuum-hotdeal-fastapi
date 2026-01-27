@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ko">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>관리자 페이지 - tuum.day</title>
+        <link rel="stylesheet" href="./style.css" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+        <style>
+            /* Admin Page Specific Styles */
+            .admin-container {
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: var(--spacing-xl);
+            }
+
+            .admin-tabs {
+                display: flex;
+                margin-bottom: var(--spacing-xl);
+                border-bottom: 2px solid var(--border-color);
+            }
+
+            .admin-tab {
+                padding: var(--spacing-md) var(--spacing-xl);
+                cursor: pointer;
+                font-weight: 500;
+                color: var(--text-muted-color);
+                border-bottom: 2px solid transparent;
+                margin-bottom: -2px;
+                transition: all var(--transition-base);
+            }
+
+            .admin-tab:hover {
+                color: var(--primary-color);
+                background-color: rgba(0, 0, 0, 0.02);
+            }
+
+            .admin-tab.active {
+                color: var(--primary-color);
+                border-bottom-color: var(--primary-color);
+            }
+
+            .admin-section {
+                display: none;
+                background: var(--container-bg);
+                padding: var(--spacing-xl);
+                border-radius: var(--border-radius-md);
+                box-shadow: 0 2px 4px var(--shadow-color);
+            }
+
+            .admin-section.active {
+                display: block;
+                animation: fadeIn var(--transition-base) ease-in-out;
+            }
+
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(5px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+
+            /* Table Styles */
+            .admin-table-container {
+                overflow-x: auto;
+            }
+
+            .admin-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: var(--spacing-md);
+            }
+
+            .admin-table th,
+            .admin-table td {
+                padding: var(--spacing-md);
+                text-align: left;
+                border-bottom: 1px solid var(--border-color);
+            }
+
+            .admin-table th {
+                background-color: #f8f9fa;
+                font-weight: 600;
+                color: var(--text-dark-color);
+            }
+
+            .admin-table tr:hover {
+                background-color: #f8f9fa;
+            }
+            
+            .action-btn {
+                padding: 4px 8px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+                border: 1px solid transparent;
+                transition: all 0.2s;
+            }
+
+            .btn-approve {
+                background-color: #e6f4ea;
+                color: #1e7e34;
+                border-color: #c3e6cb;
+            }
+            
+            .btn-approve:hover {
+                background-color: #d4edda;
+            }
+
+            .btn-delete {
+                background-color: #fbe9eb;
+                color: #dc3545;
+                border-color: #f5c6cb;
+            }
+
+            .btn-delete:hover {
+                background-color: #f8d7da;
+            }
+
+            .status-badge {
+                display: inline-block;
+                padding: 2px 8px;
+                border-radius: 12px;
+                font-size: 11px;
+                font-weight: 500;
+            }
+            
+            .status-admin { background-color: #e2e3e5; color: #383d41; }
+            .status-user { background-color: #cce5ff; color: #004085; }
+            
+            .log-level-info { color: #004085; background-color: #cce5ff; }
+            .log-level-warn { color: #856404; background-color: #fff3cd; }
+            .log-level-error { color: #721c24; background-color: #f8d7da; }
+        </style>
+    </head>
+    <body class="hotdeal-page">
+        <nav class="main-nav">
+            <div class="nav-content">
+                <div class="nav-left">
+                    <img
+                        src="https://ktlnpawucfuxjbufkplf.supabase.co/storage/v1/object/public/pb//tuum.png"
+                        alt="tuum.day 로고"
+                        class="nav-logo"
+                    />
+                    <h1>tuum.day <span style="font-size: 0.6em; color: var(--text-muted-color); font-weight: normal;">Admin</span></h1>
+                </div>
+                <div class="nav-right">
+                    <a href="/hotdeal.html" class="nav-button search-link-button"><i class="fas fa-arrow-left"></i> 돌아가기</a>
+                    <span id="user-nickname"></span>
+                    <button id="logout-button" class="nav-button"><i class="fas fa-sign-out-alt"></i> 로그아웃</button>
+                </div>
+            </div>
+        </nav>
+
+        <main class="admin-container">
+            <div class="admin-tabs">
+                <div class="admin-tab active" data-tab="users">사용자 관리</div>
+                <div class="admin-tab" data-tab="keywords">키워드 관리</div>
+                <div class="admin-tab" data-tab="logs">시스템 로그</div>
+            </div>
+
+            <!-- 사용자 관리 섹션 -->
+            <section id="user-section" class="admin-section active">
+                <h2><i class="fas fa-users"></i> 사용자 목록</h2>
+                <div class="admin-table-container">
+                    <table class="admin-table" id="users-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>이메일</th>
+                                <th>닉네임</th>
+                                <th>권한</th>
+                                <th>가입일</th>
+                                <th>관리</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- JS로 로드됨 -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- 키워드 관리 섹션 -->
+            <section id="keyword-section" class="admin-section">
+                <h2><i class="fas fa-tags"></i> 전체 키워드 목록</h2>
+                <div class="admin-table-container">
+                    <table class="admin-table" id="keywords-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>키워드</th>
+                                <th>사용자 ID</th>
+                                <th>등록일</th>
+                                <th>관리</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- JS로 로드됨 -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- 시스템 로그 섹션 -->
+            <section id="log-section" class="admin-section">
+                <h2><i class="fas fa-history"></i> 시스템 로그</h2>
+                <div class="admin-table-container">
+                    <table class="admin-table" id="logs-table">
+                        <thead>
+                            <tr>
+                                <th>시간</th>
+                                <th>레벨</th>
+                                <th>메시지</th>
+                                <th>출처</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- JS로 로드됨 -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+
+        <script src="./js/auth.js?v=1.0.1"></script>
+        <script src="./js/admin.js?v=1.0.0"></script>
+    </body>
+</html>

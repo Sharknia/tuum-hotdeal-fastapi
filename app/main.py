@@ -138,5 +138,9 @@ if settings.ENVIRONMENT == "local":
     async def hotdeal_page():
         return FileResponse("static/hotdeal.html")
 
+    @app.get("/admin", response_class=FileResponse)
+    async def admin_page():
+        return FileResponse("static/admin.html")
+
     # Static files 마운트 (가장 마지막에)
     app.mount("/", StaticFiles(directory="static"), name="static")

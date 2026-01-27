@@ -5,16 +5,16 @@ from logging.config import fileConfig
 # ---- 추가 시작 ----
 from sqlalchemy import engine_from_config, pool
 
+# 프로젝트 루트를 sys.path에 추가
+project_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, project_dir)
+
 # config 모듈 임포트
 # from app.src.core.config import settings # 기존 방식 주석 처리
 import app.src.core.config  # 상대 경로 방식으로 임포트 시도
 from alembic import context
 
 settings = app.src.core.config.settings  # settings 객체 접근
-
-# 프로젝트 루트를 sys.path에 추가
-project_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-sys.path.insert(0, project_dir)
 
 
 # 모델 및 Base 임포트 경로 수정
@@ -42,11 +42,13 @@ if config.config_file_name is not None:
 import app.src.domain.hotdeal.models
 import app.src.domain.mail.models
 import app.src.domain.user.models
+import app.src.domain.admin.models
 
 User = app.src.domain.user.models.User
 Keyword = app.src.domain.hotdeal.models.Keyword
 MailLog = app.src.domain.mail.models.MailLog
 KeywordSite = app.src.domain.hotdeal.models.KeywordSite
+WorkerLog = app.src.domain.admin.models.WorkerLog
 target_metadata = Base.metadata  # 우리 프로젝트의 Base.metadata 사용
 # ---- 수정 끝 ----
 
