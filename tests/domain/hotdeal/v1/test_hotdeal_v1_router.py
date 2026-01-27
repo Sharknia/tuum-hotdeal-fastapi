@@ -1,5 +1,6 @@
-import pytest
 from datetime import datetime
+
+import pytest
 from fastapi import Response
 
 from app.src.core.exceptions.client_exceptions import ClientErrors

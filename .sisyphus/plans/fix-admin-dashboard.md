@@ -36,16 +36,16 @@ This plan follows a strict **Feature Branch Workflow** including testing and lin
 
 ### 3. Quality Assurance
 - [x] **Backend Tests**: Run `pytest tests/domain/admin/` to verify admin domain logic.
-- [ ] **Linter Check**: Run `ruff check .` and fix any linting errors introduced.
+- [x] **Linter Check**: Run `ruff check .` and fix any linting errors introduced.
 
 ### 4. Finalize
-- [ ] **Git Commit**: Message `fix(admin): repair dashboard crash and align data schemas`.
-- [ ] **Git Push**: Push to `origin fix/admin-dashboard-recovery`.
+- [x] **Git Commit**: Message `fix(admin): repair dashboard crash and align data schemas`.
+- [x] **Git Push**: Push to `origin fix/admin-dashboard-recovery`.
 
 ## Verification Criteria
-- [ ] `static/js/admin.js` must end cleanly with a single `})();`.
-- [ ] Admin dashboard tabs must switch correctly.
-- [ ] User list must show Join Date.
-- [ ] Keyword list must NOT show User ID column.
-- [ ] System logs must show proper Status badges.
-- [ ] All tests must pass and linter should be clean.
+- [x] `static/js/admin.js` must end cleanly with a single `})();`.
+- [x] Admin dashboard tabs must switch correctly.
+- [x] User list must show Join Date.
+- [x] Keyword list must NOT show User ID column.
+- [x] System logs must show proper Status badges.
+- [x] All tests must pass and linter should be clean.
