@@ -36,6 +36,7 @@ elif settings.ENVIRONMENT == "prod":
         "https://www.tuum.day",
         "https://tuum.day",
         "https://api.tuum.day",
+        "https://hotdeal.tuum.day",
     ]
 else:
     origins = []
