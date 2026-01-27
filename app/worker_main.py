@@ -1,5 +1,6 @@
 import asyncio
 import random
+import traceback
 from datetime import datetime
 
 import httpx
@@ -11,6 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from app.src.core.config import settings
 from app.src.core.logger import logger
+from app.src.domain.admin.models import WorkerLog, WorkerStatus
 from app.src.domain.hotdeal.enums import SiteName
 from app.src.domain.hotdeal.models import Keyword, KeywordSite
 from app.src.domain.hotdeal.schemas import CrawledKeyword
@@ -206,7 +208,19 @@ async def job():
     """
     사용자와 연결된 키워드만 불러와 병렬로 처리하고, 결과를 취합하여 메일을 발송합니다.
     """
+    log_id = None
+    try:
+        async with AsyncSessionLocal() as session:
+            log_entry = WorkerLog(status=WorkerStatus.RUNNING)
+            session.add(log_entry)
+            await session.commit()
+            await session.refresh(log_entry)
+            log_id = log_entry.id
+    except Exception as e:
+        logger.error(f"Failed to create worker log: {e}")
+
     await SharedBrowser.get_instance().start()
+    total_items_found = 0
     try:
         # Supabase DB 활성화를 위한 주기적인 호출
         try:
@@ -280,6 +294,7 @@ async def job():
                 logger.error(f"키워드 '[{failed_keyword.title}]' 처리 중 오류 발생: {res}")
             elif res:
                 keyword, deals = res
+                total_items_found += len(deals)
                 id_to_crawled_keyword[keyword] = deals
 
         logger.info("[INFO] 모든 키워드 크롤링 완료. 메일 발송 시작...")
@@ -352,6 +367,35 @@ async def job():
 
         # 작업이 완료되면 지역 변수인 id_to_crawled_keyword는 자동으로 사라집니다.
         logger.info("[INFO] 메일 발송 완료 및 크롤링 결과 초기화")
+
+        if log_id:
+            try:
+                async with AsyncSessionLocal() as session:
+                    stmt = select(WorkerLog).where(WorkerLog.id == log_id)
+                    result = await session.execute(stmt)
+                    log = result.scalars().first()
+                    if log:
+                        log.status = WorkerStatus.SUCCESS
+                        log.items_found = total_items_found
+                        await session.commit()
+            except Exception as e:
+                logger.error(f"Failed to update worker log success: {e}")
+    except Exception as e:
+        logger.error(f"Job failed with error: {e}")
+        if log_id:
+            try:
+                async with AsyncSessionLocal() as session:
+                    stmt = select(WorkerLog).where(WorkerLog.id == log_id)
+                    result = await session.execute(stmt)
+                    log = result.scalars().first()
+                    if log:
+                        log.status = WorkerStatus.FAIL
+                        log.message = str(e)
+                        log.details = traceback.format_exc()
+                        await session.commit()
+            except Exception as db_e:
+                logger.error(f"Failed to update worker log fail: {db_e}")
+        raise
     finally:
         await SharedBrowser.get_instance().stop()
 
