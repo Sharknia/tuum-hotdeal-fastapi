@@ -1,37 +1,5 @@
 (async () => {
-    // 1. 관리자 권한 체크
-    if (!hasValidTokens()) {
-        window.location.href = '/login';
-        return;
-    }
-
-    const userInfo = await getUserInfo();
-    if (!userInfo) {
-        window.location.href = '/login';
-        return;
-    }
-
-    // auth_level 9 이상이 아니면 홈으로 리다이렉트
-    if (userInfo.auth_level < 9) {
-        alert('접근 권한이 없습니다.');
-        window.location.href = '/hotdeal.html';
-        return;
-    }
-
-    // 닉네임 표시
-    const nicknameEl = document.getElementById('user-nickname');
-    if (nicknameEl) {
-        nicknameEl.textContent = userInfo.nickname;
-    }
-
-    // 로그아웃 버튼
-    document.getElementById('logout-button')?.addEventListener('click', () => {
-        if (confirm('정말로 로그아웃하시겠습니까?')) {
-            logout();
-        }
-    });
-
-    // 2. 탭 전환 로직
+    // 1. 탭 전환 로직 (초기화 우선 실행)
     const tabs = document.querySelectorAll('.admin-tab');
     const sections = document.querySelectorAll('.admin-section');
 
@@ -57,6 +25,46 @@
         });
     });
 
+    // 2. 관리자 권한 체크
+    if (!hasValidTokens()) {
+        window.location.href = '/login';
+        return;
+    }
+
+    let userInfo;
+    try {
+        userInfo = await getUserInfo();
+    } catch (error) {
+        console.error('Failed to get user info:', error);
+        window.location.href = '/login';
+        return;
+    }
+
+    if (!userInfo) {
+        window.location.href = '/login';
+        return;
+    }
+
+    // auth_level 9 이상이 아니면 홈으로 리다이렉트
+    if (userInfo.auth_level < 9) {
+        alert('접근 권한이 없습니다.');
+        window.location.href = '/hotdeal.html';
+        return;
+    }
+
+    // 닉네임 표시
+    const nicknameEl = document.getElementById('user-nickname');
+    if (nicknameEl) {
+        nicknameEl.textContent = userInfo.nickname;
+    }
+
+    // 로그아웃 버튼
+    document.getElementById('logout-button')?.addEventListener('click', () => {
+        if (confirm('정말로 로그아웃하시겠습니까?')) {
+            logout();
+        }
+    });
+
     // 초기 로드
     loadUsers();
 
@@ -69,7 +77,8 @@
             const response = await fetchWithAuth('/admin/users');
             if (!response.ok) throw new Error('Failed to fetch users');
             
-            const users = await response.json();
+            const data = await response.json();
+            const users = data.items || data;
             tbody.innerHTML = '';
 
             if (users.length === 0) {
@@ -112,7 +121,8 @@
             const response = await fetchWithAuth('/admin/keywords');
             if (!response.ok) throw new Error('Failed to fetch keywords');
 
-            const keywords = await response.json();
+            const data = await response.json();
+            const keywords = data.items || data;
             tbody.innerHTML = '';
 
             if (keywords.length === 0) {
@@ -126,7 +136,7 @@
 
                 tr.innerHTML = `
                     <td>${kw.id}</td>
-                    <td>${kw.keyword}</td>
+                    <td>${kw.title || kw.keyword}</td>
                     <td>${kw.user_id}</td>
                     <td>${date}</td>
                     <td>
@@ -149,7 +159,8 @@
             const response = await fetchWithAuth('/admin/logs');
             if (!response.ok) throw new Error('Failed to fetch logs');
 
-            const logs = await response.json();
+            const data = await response.json();
+            const logs = data.items || data;
             tbody.innerHTML = '';
 
             if (logs.length === 0) {
@@ -159,7 +170,7 @@
 
             logs.forEach(log => {
                 const tr = document.createElement('tr');
-                const date = new Date(log.created_at).toLocaleString();
+                const date = new Date(log.run_at || log.created_at).toLocaleString();
                 let levelClass = '';
                 if (log.level === 'INFO') levelClass = 'log-level-info';
                 else if (log.level === 'WARN') levelClass = 'log-level-warn';
@@ -185,7 +196,7 @@
         
         try {
             const response = await fetchWithAuth(`/admin/users/${userId}/approve`, {
-                method: 'POST'
+                method: 'PATCH'
             });
             
             if (response.ok) {
@@ -200,6 +211,29 @@
             alert('오류가 발생했습니다.');
         }
     };
+
+    window.deleteKeyword = async (keywordId) => {
+        if (!confirm('이 키워드를 정말 삭제하시겠습니까?')) return;
+
+        try {
+            const response = await fetchWithAuth(`/admin/keywords/${keywordId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                alert('키워드가 삭제되었습니다.');
+                loadKeywords(); // 목록 새로고침
+            } else {
+                const error = await response.text();
+                alert('삭제 실패: ' + error);
+            }
+        } catch (error) {
+            console.error(error);
+            alert('오류가 발생했습니다.');
+        }
+    };
+
+})();
 
     window.deleteKeyword = async (keywordId) => {
         if (!confirm('이 키워드를 정말 삭제하시겠습니까?')) return;
