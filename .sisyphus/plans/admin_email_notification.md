@@ -101,7 +101,7 @@ The user wants to notify **all admin users** via email when a new user signs up.
         - Lint checks pass.
         - Tests pass.
 
-- [ ] 5. Git Commit & Push
+- [x] 5. Git Commit & Push
     - **What to do**:
         - `git add .`
         - `git commit -m "feat: send admin notification on user signup"`
