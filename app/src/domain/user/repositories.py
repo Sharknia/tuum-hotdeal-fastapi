@@ -224,3 +224,9 @@ async def check_user_active(
     if is_active is None:
         return False
     return is_active
+
+
+async def get_all_admins(db: AsyncSession) -> list[str]:
+    """관리자 권한을 가진 모든 사용자의 이메일 목록을 조회합니다."""
+    result = await db.execute(select(User.email).where(User.auth_level == AuthLevel.ADMIN))
+    return list(result.scalars().all())

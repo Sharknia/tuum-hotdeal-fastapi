@@ -11,6 +11,7 @@ from app.src.core.dependencies.auth import (
     delete_refresh_token,
 )
 from app.src.core.exceptions.auth_excptions import AuthErrors
+from app.src.core.logger import logger
 from app.src.core.security import hash_password, verify_password
 from app.src.domain.user.enums import AuthLevel
 from app.src.domain.user.repositories import (
@@ -22,6 +23,7 @@ from app.src.domain.user.schemas import (
     LoginResponse,
     UserResponse,
 )
+from app.src.Infrastructure.mail.mail_manager import send_email
 
 
 async def create_new_user(
@@ -153,3 +155,17 @@ async def get_user_info(
         raise AuthErrors.USER_NOT_FOUND
 
     return UserResponse.model_validate(user)
+
+
+async def send_new_user_notifications(admin_emails: list[str], user: UserResponse) -> None:
+    subject = f"[Tuum] 신규 회원 가입: {user.nickname}"
+    body = f"""새로운 회원이 가입했습니다.
+이메일: {user.email}
+닉네임: {user.nickname}
+관리자: https://hotdeal.tuum.day/admin"""
+
+    for email in admin_emails:
+        try:
+            await send_email(subject=subject, to=email, body=body)
+        except Exception as e:
+            logger.error(f"신규 가입 알림 메일 발송 중 오류 발생 ({email}): {e}")
