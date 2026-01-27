@@ -7,8 +7,14 @@ from app.src.core.dependencies.auth import authenticate_admin_user
 from app.src.core.dependencies.db_session import get_db
 from app.src.core.exceptions.auth_excptions import AuthErrors
 from app.src.domain.user.repositories import get_all_users, activate_user
+from app.src.domain.hotdeal.repositories import get_all_keywords, delete_keyword
+from app.src.domain.admin.repositories import get_all_worker_logs
 from app.src.domain.user.schemas import AuthenticatedUser, UserResponse
-from app.src.domain.admin.schemas import UserListResponse
+from app.src.domain.admin.schemas import (
+    UserListResponse,
+    KeywordListResponse,
+    WorkerLogListResponse,
+)
 from app.worker_main import job
 
 router = APIRouter(
@@ -38,6 +44,41 @@ async def approve_user(
     if not user:
         raise AuthErrors.USER_NOT_FOUND
     return user
+
+
+@router.get("/keywords", response_model=KeywordListResponse, summary="전체 키워드 조회")
+async def get_keywords(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[AuthenticatedUser, Depends(authenticate_admin_user)],
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1),
+):
+    keywords = await get_all_keywords(db, skip=skip, limit=limit)
+    return {"items": keywords}
+
+
+@router.delete(
+    "/keywords/{keyword_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="키워드 삭제",
+)
+async def remove_keyword(
+    keyword_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[AuthenticatedUser, Depends(authenticate_admin_user)],
+):
+    await delete_keyword(db, keyword_id)
+
+
+@router.get("/logs", response_model=WorkerLogListResponse, summary="워커 로그 조회")
+async def get_logs(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[AuthenticatedUser, Depends(authenticate_admin_user)],
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1),
+):
+    logs = await get_all_worker_logs(db, skip=skip, limit=limit)
+    return {"items": logs}
 
 
 @router.post(
