@@ -281,6 +281,15 @@ async def delete_all_user_tokens(
     await db.commit()
 
 
+async def delete_token_by_hash(
+    db: AsyncSession,
+    token_hash: str,
+) -> None:
+    """이미 해시된 토큰 해시값으로 리프레시 토큰을 삭제합니다 (RTR용)."""
+    await db.execute(delete(RefreshToken).where(RefreshToken.token_hash == token_hash))
+    await db.commit()
+
+
 async def check_user_active(
     db: AsyncSession,
     user_id: UUID,

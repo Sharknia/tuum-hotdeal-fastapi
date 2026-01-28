@@ -43,6 +43,8 @@ class AuthenticatedUser(BaseModel):
     email: EmailStr
     nickname: str
     auth_level: AuthLevel
+    # RTR(Refresh Token Rotation)을 위한 토큰 식별자 - 리프레시 토큰에서만 전달됨
+    token_hash: str | None = None
 
 
 class LogoutResponse(BaseModel):
