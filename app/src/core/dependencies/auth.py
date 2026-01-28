@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import Cookie, Depends, Header, Response
 from jose import ExpiredSignatureError, JWTError, jwt
@@ -12,9 +12,11 @@ from app.src.core.exceptions.auth_excptions import AuthErrors
 from app.src.domain.user.enums import AuthLevel
 from app.src.domain.user.repositories import (
     check_user_active,
-    init_refresh_token,
     save_refresh_token,
     verify_refresh_token,
+)
+from app.src.domain.user.repositories import (
+    delete_refresh_token as repo_delete_refresh_token,
 )
 from app.src.domain.user.schemas import AuthenticatedUser
 
@@ -57,13 +59,20 @@ async def create_refresh_token(
     user_id: UUID,
     email: str,
     expires_delta: timedelta = timedelta(days=7),
+    user_agent: str | None = None,
 ) -> str:
     """
     Refresh Token 생성 함수
+    - user_agent: 브라우저 User-Agent 헤더 (512자로 제한)
     """
     user_id_str = str(user_id)
 
+    # User-Agent 길이 제한 (512자)
+    if user_agent and len(user_agent) > 512:
+        user_agent = user_agent[:512]
+
     payload = {
+        "jti": str(uuid4()),  # JWT ID: 각 토큰에 고유 식별자 추가
         "user_id": user_id_str,
         "email": email,
         "exp": datetime.now(UTC) + expires_delta,
@@ -71,7 +80,7 @@ async def create_refresh_token(
     refresh_token = jwt.encode(
         payload, settings.REFRESH_TOKEN_SECRET_KEY, algorithm=ALGORITHM
     )
-    await save_refresh_token(db, user_id, refresh_token)
+    await save_refresh_token(db, user_id, refresh_token, user_agent=user_agent)
 
     # 환경에 따라 secure, domain, samesite 속성 결정
     environment = settings.ENVIRONMENT
@@ -100,9 +109,11 @@ async def create_refresh_token(
 async def delete_refresh_token(
     db: AsyncSession,
     response: Response,
-    user_id: UUID,
+    refresh_token: str | None = None,
 ) -> None:
-    await init_refresh_token(db, user_id)
+    """현재 세션만 로그아웃합니다 (쿠키의 토큰 기반)."""
+    if refresh_token:
+        await repo_delete_refresh_token(db, refresh_token)
 
     # 환경에 따라 secure, domain, samesite 속성 결정 (쿠키 생성 시와 동일한 로직 사용)
     environment = getattr(settings, "ENVIRONMENT", "development")
@@ -221,7 +232,7 @@ async def authenticate_refresh_token(
 
         # db에 저장된 리프레시 토큰과 비교
         try:
-            user = await verify_refresh_token(db, user_id, token)
+            user = await verify_refresh_token(db, token)
             if not user:
                 raise AuthErrors.INVALID_TOKEN
         except ValueError as e:

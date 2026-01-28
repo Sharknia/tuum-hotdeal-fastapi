@@ -1,11 +1,16 @@
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.src.core.security import get_token_hash
+
 from .enums import AuthLevel
-from .models import User
+from .models import RefreshToken, User
+
+MAX_SESSIONS_PER_USER = 5
 
 
 async def create_user(
@@ -184,33 +189,95 @@ async def save_refresh_token(
     db: AsyncSession,
     user_id: UUID,
     token: str,
+    expires_delta: timedelta = timedelta(days=7),
+    user_agent: str | None = None,
 ) -> None:
-    """사용자의 리프레시 토큰을 저장합니다."""
-    stmt = update(User).where(User.id == user_id).values(refresh_token=token)
-    await db.execute(stmt)
+    """새 리프레시 토큰을 저장합니다. (만료토큰 정리 + 세션 제한 적용)"""
+    now = datetime.now(UTC)
+    expires_at = now + expires_delta
+
+    await db.execute(
+        delete(RefreshToken).where(
+            RefreshToken.user_id == user_id,
+            RefreshToken.expires_at < now,
+        )
+    )
+
+    result = await db.execute(
+        select(func.count())
+        .select_from(RefreshToken)
+        .where(
+            RefreshToken.user_id == user_id,
+            RefreshToken.expires_at > now,
+        )
+    )
+    active_session_count = result.scalar() or 0
+
+    if active_session_count >= MAX_SESSIONS_PER_USER:
+        oldest_token = await db.execute(
+            select(RefreshToken.id)
+            .where(
+                RefreshToken.user_id == user_id,
+                RefreshToken.expires_at > now,
+            )
+            .order_by(RefreshToken.created_at.asc())
+            .limit(1)
+        )
+        oldest_id = oldest_token.scalar()
+        if oldest_id:
+            await db.execute(delete(RefreshToken).where(RefreshToken.id == oldest_id))
+
+    token_hash = get_token_hash(token)
+    new_refresh_token = RefreshToken(
+        user_id=user_id,
+        token_hash=token_hash,
+        user_agent=user_agent,
+        expires_at=expires_at,
+    )
+    db.add(new_refresh_token)
     await db.commit()
 
 
 async def verify_refresh_token(
     db: AsyncSession,
-    user_id: UUID,
     token: str,
 ) -> User | None:
-    """제공된 리프레시 토큰이 저장된 토큰과 일치하는지 확인합니다."""
+    """리프레시 토큰을 검증하고 해당 사용자를 반환합니다."""
+    token_hash = get_token_hash(token)
+    now = datetime.now(UTC)
+
     result = await db.execute(
-        select(User).where(User.id == user_id).where(User.refresh_token == token)
+        select(RefreshToken)
+        .where(
+            RefreshToken.token_hash == token_hash,
+            RefreshToken.expires_at > now,
+        )
+        .options(selectinload(RefreshToken.user))
     )
-    user: User | None = result.scalar_one_or_none()
-    return user
+    refresh_token = result.scalar_one_or_none()
+
+    if refresh_token is None:
+        return None
+
+    return refresh_token.user
 
 
-async def init_refresh_token(
+async def delete_refresh_token(
+    db: AsyncSession,
+    token: str,
+) -> None:
+    """특정 리프레시 토큰을 삭제합니다 (로그아웃)."""
+    token_hash = get_token_hash(token)
+    await db.execute(delete(RefreshToken).where(RefreshToken.token_hash == token_hash))
+    await db.commit()
+
+
+async def delete_all_user_tokens(
     db: AsyncSession,
     user_id: UUID,
 ) -> None:
-    """사용자의 리프레시 토큰을 초기화합니다 (None으로 설정)."""
-    stmt = update(User).where(User.id == user_id).values(refresh_token=None)
-    await db.execute(stmt)
+    """특정 사용자의 모든 리프레시 토큰을 삭제합니다 (전체 로그아웃)."""
+    await db.execute(delete(RefreshToken).where(RefreshToken.user_id == user_id))
     await db.commit()
 
 

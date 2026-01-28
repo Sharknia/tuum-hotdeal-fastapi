@@ -116,7 +116,9 @@ async def test_create_refresh_token():
         ) < timedelta(seconds=60)
 
         # save_refresh_token 호출 검증
-        mock_save_token.assert_awaited_once_with(mock_db, test_user_id, token)
+        mock_save_token.assert_awaited_once_with(
+            mock_db, test_user_id, token, user_agent=None
+        )
 
 
 # ---- registered_user 테스트 시작 ----

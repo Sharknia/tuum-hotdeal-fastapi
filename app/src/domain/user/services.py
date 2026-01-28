@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import Response
+from fastapi import Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.src.core.config import settings
@@ -64,6 +64,7 @@ async def login_user(
     response: Response,
     email: str,
     password: str,
+    request: Request | None = None,
 ) -> LoginResponse:
     user = await get_user_by_email(db, email=email)
     if not user:
@@ -75,11 +76,14 @@ async def login_user(
     if not user.is_active:
         raise AuthErrors.USER_NOT_ACTIVE
 
+    user_agent = request.headers.get("user-agent") if request else None
+
     await create_refresh_token(
         db=db,
         response=response,
         user_id=user.id,
         email=user.email,
+        user_agent=user_agent,
     )
 
     # 마지막 로그인 시간 업데이트
@@ -99,6 +103,7 @@ async def logout_user(
     db: AsyncSession,
     response: Response,
     user_id: UUID,
+    refresh_token: str | None = None,
 ) -> None:
     # 실제 있는 유저인지 확인
     user = await get_user_by_id(db, user_id)
@@ -110,7 +115,7 @@ async def logout_user(
         raise AuthErrors.USER_NOT_ACTIVE
 
     # 액세스 토큰을 블랙리스트에 등록하는 로직은 생략
-    await delete_refresh_token(db, response, user_id)
+    await delete_refresh_token(db, response, refresh_token)
     return None
 
 

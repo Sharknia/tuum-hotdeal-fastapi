@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Response, status
+from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.src.core.dependencies.auth import authenticate_refresh_token, registered_user
@@ -76,7 +76,8 @@ async def signup(
     ),
 )
 async def login(
-    request: UserLoginRequest,
+    request: Request,
+    body: UserLoginRequest,
     response: Response,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> LoginResponse:
@@ -89,8 +90,9 @@ async def login(
     user: LoginResponse = await login_user(
         db=db,
         response=response,
-        email=request.email,
-        password=request.password,
+        email=body.email,
+        password=body.password,
+        request=request,
     )
     return user
 
@@ -109,7 +111,8 @@ async def login(
 async def logout(
     db: Annotated[AsyncSession, Depends(get_db)],
     response: Response,
-    login_user: Annotated[AuthenticatedUser, Depends(registered_user)],
+    current_user: Annotated[AuthenticatedUser, Depends(registered_user)],
+    refresh_token: str | None = Cookie(None),
 ) -> LogoutResponse:
     """
     사용자 로그아웃
@@ -117,7 +120,8 @@ async def logout(
     await logout_user(
         db=db,
         response=response,
-        user_id=login_user.user_id,
+        user_id=current_user.user_id,
+        refresh_token=refresh_token,
     )
     return LogoutResponse()
 

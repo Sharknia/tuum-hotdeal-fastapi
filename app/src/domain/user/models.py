@@ -37,7 +37,6 @@ class User(Base):
         Integer, nullable=False, server_default=text(str(AuthLevel.USER.value))
     )
     is_active = Column(Boolean, nullable=False, server_default=text("false"))
-    refresh_token = Column(String(255), nullable=True)
     last_login = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
@@ -46,3 +45,27 @@ class User(Base):
 
     keywords = relationship("Keyword", secondary=user_keywords, back_populates="users")
     mail_logs = relationship("MailLog", back_populates="user")
+    refresh_tokens = relationship(
+        "RefreshToken", back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class RefreshToken(Base):
+    """다중 세션 지원을 위한 리프레시 토큰 모델"""
+
+    __tablename__ = "refresh_tokens"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # SHA-256 해시된 토큰 (64 chars)
+    token_hash = Column(String(64), nullable=False, unique=True, index=True)
+    user_agent = Column(String(512), nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", back_populates="refresh_tokens")

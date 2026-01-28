@@ -1,4 +1,14 @@
+import hashlib
+
 import bcrypt
+
+
+def get_token_hash(token: str) -> str:
+    """
+    토큰을 SHA-256으로 해싱하여 반환합니다.
+    DB 유출 시 원본 토큰 노출을 방지합니다.
+    """
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def verify_password(
