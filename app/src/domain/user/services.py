@@ -16,6 +16,7 @@ from app.src.core.security import hash_password, verify_password
 from app.src.domain.user.enums import AuthLevel
 from app.src.domain.user.repositories import (
     create_user,
+    delete_token_by_hash,
     get_user_by_email,
     get_user_by_id,
 )
@@ -124,6 +125,7 @@ async def refresh_access_token(
     response: Response,
     user_id: UUID,
     email: str,
+    token_hash: str | None = None,
 ) -> LoginResponse:
     user = await get_user_by_id(db, user_id)
     if not user:
@@ -131,6 +133,10 @@ async def refresh_access_token(
 
     if not user.is_active:
         raise AuthErrors.USER_NOT_ACTIVE
+
+    # RTR: 기존 토큰 삭제 (새 토큰 생성 전)
+    if token_hash:
+        await delete_token_by_hash(db, token_hash)
 
     access_token = await create_access_token(
         user_id=user_id,

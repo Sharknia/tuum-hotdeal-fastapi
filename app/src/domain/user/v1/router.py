@@ -153,6 +153,7 @@ async def refresh_token(
         response=response,
         user_id=refresh_user.user_id,
         email=refresh_user.email,
+        token_hash=refresh_user.token_hash,
     )
     return result
 

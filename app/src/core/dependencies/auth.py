@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.src.core.config import settings
 from app.src.core.dependencies.db_session import get_db
 from app.src.core.exceptions.auth_excptions import AuthErrors
+from app.src.core.security import get_token_hash
 from app.src.domain.user.enums import AuthLevel
 from app.src.domain.user.repositories import (
     check_user_active,
@@ -238,12 +239,16 @@ async def authenticate_refresh_token(
         except ValueError as e:
             raise AuthErrors.INVALID_TOKEN from e
 
-        # 인증된 사용자 정보 반환
+        # 토큰 해시 계산 (RTR용 토큰 식별자)
+        calculated_hash = get_token_hash(token)
+
+        # 인증된 사용자 정보 반환 (토큰 해시 포함)
         return AuthenticatedUser(
             user_id=user_id,
             email=email,
             nickname=user.nickname,
             auth_level=AuthLevel.USER,
+            token_hash=calculated_hash,
         )
 
     except ExpiredSignatureError as e:

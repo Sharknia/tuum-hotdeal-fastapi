@@ -15,7 +15,7 @@ from app.src.domain.user.repositories import (
     save_refresh_token,
     verify_refresh_token,
 )
-from app.src.domain.user.services import logout_user
+from app.src.domain.user.services import logout_user, refresh_access_token
 
 ALGORITHM = "HS256"
 
@@ -288,3 +288,70 @@ async def test_multiple_sessions_different_devices(
     )
 
     assert await verify_refresh_token(mock_db_session, token_b) is None, "B기기 로그아웃 후 토큰 삭제 확인"
+
+
+@pytest.mark.asyncio
+async def test_refresh_token_rotation(
+    add_mock_user,
+    mock_db_session: AsyncSession,
+):
+    """
+    테스트 케이스: 토큰 갱신 후 기존 토큰 재사용 불가 (RTR)
+
+    토큰 갱신 시 기존 토큰이 삭제되어 재사용 불가능한지 확인합니다.
+    """
+    from app.src.core.security import get_token_hash
+
+    # 1. 사용자 생성
+    user = await add_mock_user(
+        email="rtr-test@example.com",
+        password="securepassword",
+        nickname="test_user",
+        is_active=True,
+    )
+
+    now = dt.datetime.now(UTC)
+
+    # 2. 초기 토큰 A 발급
+    payload_a = {
+        "user_id": str(user.id),
+        "email": user.email,
+        "exp": now + timedelta(days=7),
+    }
+    token_a = jwt.encode(payload_a, settings.REFRESH_TOKEN_SECRET_KEY, algorithm=ALGORITHM)
+    await save_refresh_token(mock_db_session, user.id, token_a, user_agent="Test-Device")
+
+    # 토큰 A 검증 확인
+    verified_user_a = await verify_refresh_token(mock_db_session, token_a)
+    assert verified_user_a is not None, "초기 토큰 A 검증에 성공해야 함"
+    assert verified_user_a.id == user.id
+
+    # 3. 토큰 A 갱신 (토큰 A -> 토큰 B)
+    token_a_hash = get_token_hash(token_a)
+    response = Response()
+    await refresh_access_token(
+        db=mock_db_session,
+        response=response,
+        user_id=user.id,
+        email=user.email,
+        token_hash=token_a_hash,
+    )
+
+    # 새로 발급된 리프레시 토큰을 쿠키에서 추출
+    token_b = None
+    for header_name, header_value in response.headers.items():
+        if header_name.lower() == "set-cookie" and "refresh_token=" in header_value:
+            token_b = header_value.split("refresh_token=")[1].split(";")[0]
+            break
+
+    assert token_b is not None, "새로운 리프레시 토큰이 발급되어야 함"
+    assert token_a != token_b, "토큰이 변경되어야 함"
+
+    # 4. 토큰 A는 삭제되었는지 확인
+    verified_user_a_after = await verify_refresh_token(mock_db_session, token_a)
+    assert verified_user_a_after is None, "토큰 A는 삭제되어 재사용 불가해야 함"
+
+    # 5. 토큰 B는 유효한지 확인
+    verified_user_b = await verify_refresh_token(mock_db_session, token_b)
+    assert verified_user_b is not None, "새 토큰 B는 유효해야 함"
+    assert verified_user_b.id == user.id
