@@ -11,7 +11,8 @@
     "agents": {
         // 원본 기본값: anthropic/claude-opus-4-5 (variant: max)
         "sisyphus": {
-            "model": "zai-coding-plan/glm-4.7",
+            "model": "google/antigravity-gemini-3-pro",
+            "variant": "high",
         },
 
         // 원본 기본값: zai-coding-plan/glm-4.7
@@ -26,31 +27,31 @@
 
         // 원본 기본값: openai/gpt-5.2 (variant: high)
         "oracle": {
-            "model": "google/antigravity-claude-opus-4-5-thinking",
-            "variant": "max"
+            "model": "google/antigravity-gemini-3-pro",
+            "variant": "high",
         },
 
         // 원본 기본값: google/gemini-3-flash
         "multimodal-looker": {
-            "model": "google/antigravity-gemini-3-flash",
+            "model": "zai-coding-plan/glm-4.7",
         },
 
         // 원본 기본값: anthropic/claude-opus-4-5 (variant: max)
         "prometheus": {
-            "model": "google/antigravity-claude-opus-4-5-thinking",
-            "variant": "max"
+            "model": "google/antigravity-gemini-3-pro",
+            "variant": "high",
         },
 
         // 원본 기본값: anthropic/claude-opus-4-5 (variant: max)
         "metis": {
-            "model": "google/antigravity-claude-opus-4-5-thinking",
-            "variant": "max"
+            "model": "google/antigravity-gemini-3-pro",
+            "variant": "high",
         },
 
         // 원본 기본값: openai/gpt-5.2 (variant: medium)
         "momus": {
-            "model": "google/antigravity-claude-opus-4-5-thinking",
-            "variant": "low"
+            "model": "google/antigravity-gemini-3-pro",
+            "variant": "high",
         },
 
         // 원본 기본값: anthropic/claude-sonnet-4-5
@@ -73,8 +74,8 @@
         // 원본 기본값: openai/gpt-5.2-codex (variant: xhigh)
         // 용도: Deep logical reasoning, complex architecture decisions
         "ultrabrain": {
-            "model": "google/antigravity-claude-opus-4-5-thinking",
-            "variant": "max",
+            "model": "google/antigravity-gemini-3-pro",
+            "variant": "high",
         },
 
         // 원본 기본값: google/gemini-3-pro (variant: max)
@@ -99,8 +100,8 @@
         // 원본 기본값: anthropic/claude-opus-4-5 (variant: max)
         // 용도: Substantial effort across multiple systems/modules
         "unspecified-high": {
-            "model": "google/antigravity-claude-opus-4-5-thinking",
-            "variant": "max",
+            "model": "google/antigravity-gemini-3-pro",
+            "variant": "high",
         },
 
         // 원본 기본값: google/gemini-3-flash
