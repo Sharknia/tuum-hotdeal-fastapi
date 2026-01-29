@@ -5,12 +5,10 @@ from app.src.domain.hotdeal.schemas import SiteInfo
 from app.src.Infrastructure.crawling.base_crawler import BaseCrawler
 from app.src.Infrastructure.crawling.crawlers.algumon import AlgumonCrawler
 from app.src.Infrastructure.crawling.crawlers.fmkorea import FmkoreaCrawler
-from app.src.Infrastructure.crawling.crawlers.ruliweb import RuliwebCrawler
 
 CRAWLER_REGISTRY: dict[SiteName, type[BaseCrawler]] = {
     SiteName.ALGUMON: AlgumonCrawler,
     SiteName.FMKOREA: FmkoreaCrawler,
-    SiteName.RULIWEB: RuliwebCrawler,
 }
 
 SITE_METADATA: dict[SiteName, dict[str, str]] = {
@@ -21,10 +19,6 @@ SITE_METADATA: dict[SiteName, dict[str, str]] = {
     SiteName.FMKOREA: {
         "display_name": "에펨코리아",
         "search_url_template": "https://www.fmkorea.com/search.php?mid=hotdeal&search_keyword={keyword}&search_target=title_content&sort_index=regdate&order_type=desc",
-    },
-    SiteName.RULIWEB: {
-        "display_name": "루리웹",
-        "search_url_template": "https://bbs.ruliweb.com/market/board/1020?search_type=subject&search_key={keyword}",
     },
 }
 

@@ -69,7 +69,8 @@ class TestGetSiteInfoList:
         assert algumon.display_name == "알구몬"
         assert "algumon.com" in algumon.search_url_template
 
-    def test_ruliweb_site_info(self):
+    def test_ruliweb_not_in_site_info_list(self):
+        """Ruliweb 크롤러가 제거되었으므로 site_info_list에 포함되지 않아야 함"""
         # given
         from app.src.Infrastructure.crawling.crawlers import get_site_info_list
 
@@ -78,6 +79,4 @@ class TestGetSiteInfoList:
         ruliweb = next((s for s in result if s.name == SiteName.RULIWEB), None)
 
         # then
-        assert ruliweb is not None
-        assert ruliweb.display_name == "루리웹"
-        assert "ruliweb.com" in ruliweb.search_url_template
+        assert ruliweb is None, "Ruliweb은 크롤러 레지스트리에서 제거되었으므로 site_info_list에 포함되지 않아야 함"
