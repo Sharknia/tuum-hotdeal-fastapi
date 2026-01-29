@@ -54,4 +54,8 @@ After completing tasks, ALWAYS run full tests and linter checks to ensure the de
 <name>deploy-expert</name>
 <description>(project - Skill) 안전한 배포 프로세스 담당. 기능 브랜치 검증(Lint/Test), Main 병합(--no-ff), Push 및 브랜치 정리를 수행합니다. '배포해줘', 'deploy' 명령 시 사용합니다.</description>
 </skill>
+  <skill>
+    <name>test-skill</name>
+    <description>Test description</description>
+  </skill>
 </available_skills>

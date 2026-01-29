@@ -288,19 +288,18 @@ def register_skill_in_agents_md(skill_name, description):
         print(f"❌ Error reading AGENTS.md: {e}")
         return False
 
-    if "<available_skills>" not in content:
-        print("❌ Error: <available_skills> tag not found in AGENTS.md")
-        return False
+    # Check if <available_skills> tag exists, create if not
+    opening_tag = "<available_skills>"
+    closing_tag = "</available_skills>"
+
+    if opening_tag not in content or closing_tag not in content:
+        print("⚠️  Warning: <available_skills> tag not found in AGENTS.md, creating it...")
+        content += "\n\n<available_skills>\n" + closing_tag + "\n"
 
     skill_entry = f"""  <skill>
     <name>{skill_name}</name>
     <description>{description}</description>
   </skill>"""
-
-    closing_tag = "</available_skills>"
-    if closing_tag not in content:
-        print("❌ Error: </available_skills> tag not found in AGENTS.md")
-        return False
 
     if f"<name>{skill_name}</name>" in content:
         print(f"⚠️  Warning: Skill '{skill_name}' already registered in AGENTS.md")
