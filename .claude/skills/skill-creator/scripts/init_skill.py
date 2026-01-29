@@ -3,12 +3,13 @@
 Skill Initializer - Creates a new skill from template
 
 Usage:
-    init_skill.py <skill-name> --path <path>
+    init_skill.py <skill-name> --desc <description>
 
 Examples:
-    init_skill.py my-new-skill --path skills/public
-    init_skill.py my-api-helper --path skills/private
-    init_skill.py custom-skill --path /custom/location
+    init_skill.py my-new-skill --desc "Data analysis helper"
+    init_skill.py my-api-helper --desc "API integration helper"
+
+Note: Script automatically creates skills in both .claude/skills/ and .agents/skills/
 """
 
 import sys
@@ -17,7 +18,7 @@ from pathlib import Path
 
 SKILL_TEMPLATE = """---
 name: {skill_name}
-description: [TODO: Complete and informative explanation of what the skill does and when to use it. Include WHEN to use this skill - specific scenarios, file types, or tasks that trigger it.]
+description: {description}
 ---
 
 # {skill_title}
@@ -187,116 +188,169 @@ Note: This is a text placeholder. Actual assets can be any file type.
 
 
 def title_case_skill_name(skill_name):
-    """Convert hyphenated skill name to Title Case for display."""
-    return ' '.join(word.capitalize() for word in skill_name.split('-'))
+    return " ".join(word.capitalize() for word in skill_name.split("-"))
 
 
-def init_skill(skill_name, path):
-    """
-    Initialize a new skill directory with template SKILL.md.
+def find_project_root():
+    current_path = Path(__file__).resolve().parent.parent.parent.parent
 
-    Args:
-        skill_name: Name of the skill
-        path: Path where the skill directory should be created
+    while current_path != current_path.parent:
+        agents_md_path = current_path / "AGENTS.md"
+        if agents_md_path.exists():
+            return current_path
+        current_path = current_path.parent
 
-    Returns:
-        Path to created skill directory, or None if error
-    """
-    # Determine skill directory path
-    skill_dir = Path(path).resolve() / skill_name
+    return None
 
-    # Check if directory already exists
-    if skill_dir.exists():
-        print(f"❌ Error: Skill directory already exists: {skill_dir}")
-        return None
 
-    # Create skill directory
-    try:
-        skill_dir.mkdir(parents=True, exist_ok=False)
-        print(f"✅ Created skill directory: {skill_dir}")
-    except Exception as e:
-        print(f"❌ Error creating directory: {e}")
-        return None
+def init_skill(skill_name, description):
+    project_root = find_project_root()
+    if not project_root:
+        print("❌ Error: Could not find project root (AGENTS.md not found)")
+        return None, None
 
-    # Create SKILL.md from template
+    claude_skill_dir = project_root / ".claude" / "skills" / skill_name
+    agents_skill_dir = project_root / ".agents" / "skills" / skill_name
+
+    if claude_skill_dir.exists() or agents_skill_dir.exists():
+        existing = claude_skill_dir if claude_skill_dir.exists() else agents_skill_dir
+        print(f"❌ Error: Skill directory already exists: {existing}")
+        return None, None
+
     skill_title = title_case_skill_name(skill_name)
-    skill_content = SKILL_TEMPLATE.format(
-        skill_name=skill_name,
-        skill_title=skill_title
-    )
+    skill_content = SKILL_TEMPLATE.format(skill_name=skill_name, description=description, skill_title=skill_title)
 
-    skill_md_path = skill_dir / 'SKILL.md'
-    try:
-        skill_md_path.write_text(skill_content)
-        print("✅ Created SKILL.md")
-    except Exception as e:
-        print(f"❌ Error creating SKILL.md: {e}")
-        return None
+    created_dirs = []
 
-    # Create resource directories with example files
-    try:
-        # Create scripts/ directory with example script
-        scripts_dir = skill_dir / 'scripts'
-        scripts_dir.mkdir(exist_ok=True)
-        example_script = scripts_dir / 'example.py'
-        example_script.write_text(EXAMPLE_SCRIPT.format(skill_name=skill_name))
-        example_script.chmod(0o755)
-        print("✅ Created scripts/example.py")
+    for skill_dir in [claude_skill_dir, agents_skill_dir]:
+        try:
+            skill_dir.mkdir(parents=True, exist_ok=False)
+            print(f"✅ Created skill directory: {skill_dir}")
+        except Exception as e:
+            print(f"❌ Error creating directory {skill_dir}: {e}")
+            return None, None
 
-        # Create references/ directory with example reference doc
-        references_dir = skill_dir / 'references'
-        references_dir.mkdir(exist_ok=True)
-        example_reference = references_dir / 'api_reference.md'
-        example_reference.write_text(EXAMPLE_REFERENCE.format(skill_title=skill_title))
-        print("✅ Created references/api_reference.md")
+        skill_md_path = skill_dir / "SKILL.md"
+        try:
+            skill_md_path.write_text(skill_content)
+            print(f"✅ Created {skill_dir.name}/SKILL.md")
+        except Exception as e:
+            print(f"❌ Error creating SKILL.md in {skill_dir}: {e}")
+            return None, None
 
-        # Create assets/ directory with example asset placeholder
-        assets_dir = skill_dir / 'assets'
-        assets_dir.mkdir(exist_ok=True)
-        example_asset = assets_dir / 'example_asset.txt'
-        example_asset.write_text(EXAMPLE_ASSET)
-        print("✅ Created assets/example_asset.txt")
-    except Exception as e:
-        print(f"❌ Error creating resource directories: {e}")
-        return None
+        try:
+            scripts_dir = skill_dir / "scripts"
+            scripts_dir.mkdir(exist_ok=True)
+            example_script = scripts_dir / "example.py"
+            example_script.write_text(EXAMPLE_SCRIPT.format(skill_name=skill_name))
+            example_script.chmod(0o755)
+            print(f"✅ Created {skill_dir.name}/scripts/example.py")
 
-    # Print next steps
-    print(f"\n✅ Skill '{skill_name}' initialized successfully at {skill_dir}")
+            references_dir = skill_dir / "references"
+            references_dir.mkdir(exist_ok=True)
+            example_reference = references_dir / "api_reference.md"
+            example_reference.write_text(EXAMPLE_REFERENCE.format(skill_title=skill_title))
+            print(f"✅ Created {skill_dir.name}/references/api_reference.md")
+
+            assets_dir = skill_dir / "assets"
+            assets_dir.mkdir(exist_ok=True)
+            example_asset = assets_dir / "example_asset.txt"
+            example_asset.write_text(EXAMPLE_ASSET)
+            print(f"✅ Created {skill_dir.name}/assets/example_asset.txt")
+        except Exception as e:
+            print(f"❌ Error creating resource directories in {skill_dir}: {e}")
+            return None, None
+
+        created_dirs.append(skill_dir)
+
+    print(f"\n✅ Skill '{skill_name}' initialized successfully")
+    print(f"   Claude location: {claude_skill_dir}")
+    print(f"   Agents location: {agents_skill_dir}")
     print("\nNext steps:")
     print("1. Edit SKILL.md to complete the TODO items and update the description")
     print("2. Customize or delete the example files in scripts/, references/, and assets/")
     print("3. Run the validator when ready to check the skill structure")
 
-    return skill_dir
+    return claude_skill_dir, agents_skill_dir
+
+
+def register_skill_in_agents_md(skill_name, description):
+    project_root = find_project_root()
+    if not project_root:
+        print("❌ Error: Could not find project root (AGENTS.md not found)")
+        return False
+
+    agents_md_path = project_root / "AGENTS.md"
+
+    try:
+        content = agents_md_path.read_text()
+    except Exception as e:
+        print(f"❌ Error reading AGENTS.md: {e}")
+        return False
+
+    if "<available_skills>" not in content:
+        print("❌ Error: <available_skills> tag not found in AGENTS.md")
+        return False
+
+    skill_entry = f"""  <skill>
+    <name>{skill_name}</name>
+    <description>{description}</description>
+  </skill>"""
+
+    closing_tag = "</available_skills>"
+    if closing_tag not in content:
+        print("❌ Error: </available_skills> tag not found in AGENTS.md")
+        return False
+
+    if f"<name>{skill_name}</name>" in content:
+        print(f"⚠️  Warning: Skill '{skill_name}' already registered in AGENTS.md")
+        return True
+
+    new_content = content.replace(closing_tag, skill_entry + "\n" + closing_tag)
+
+    try:
+        agents_md_path.write_text(new_content)
+        print(f"✅ Registered skill '{skill_name}' in AGENTS.md")
+        return True
+    except Exception as e:
+        print(f"❌ Error writing AGENTS.md: {e}")
+        return False
 
 
 def main():
-    if len(sys.argv) < 4 or sys.argv[2] != '--path':
-        print("Usage: init_skill.py <skill-name> --path <path>")
+    if len(sys.argv) < 4 or sys.argv[2] != "--desc":
+        print("Usage: init_skill.py <skill-name> --desc <description>")
         print("\nSkill name requirements:")
         print("  - Hyphen-case identifier (e.g., 'data-analyzer')")
         print("  - Lowercase letters, digits, and hyphens only")
         print("  - Max 40 characters")
         print("  - Must match directory name exactly")
+        print("\nDescription requirements:")
+        print("  - Brief explanation of what the skill does")
+        print("  - Include when to use this skill")
         print("\nExamples:")
-        print("  init_skill.py my-new-skill --path skills/public")
-        print("  init_skill.py my-api-helper --path skills/private")
-        print("  init_skill.py custom-skill --path /custom/location")
+        print('  init_skill.py my-new-skill --desc "Data analysis helper for processing CSV files"')
+        print('  init_skill.py my-api-helper --desc "API integration helper for REST services"')
         sys.exit(1)
 
     skill_name = sys.argv[1]
-    path = sys.argv[3]
+    description = sys.argv[3]
 
     print(f"🚀 Initializing skill: {skill_name}")
-    print(f"   Location: {path}")
+    print(f"   Description: {description}")
     print()
 
-    result = init_skill(skill_name, path)
+    claude_dir, agents_dir = init_skill(skill_name, description)
 
-    if result:
-        sys.exit(0)
-    else:
+    if not claude_dir or not agents_dir:
         sys.exit(1)
+
+    print("\n📝 Registering skill in AGENTS.md...")
+    if not register_skill_in_agents_md(skill_name, description):
+        sys.exit(1)
+
+    print("\n✅ Skill creation complete!")
+    sys.exit(0)
 
 
 if __name__ == "__main__":
