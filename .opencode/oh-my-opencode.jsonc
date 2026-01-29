@@ -1,7 +1,8 @@
 {
     "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
     "google_auth": false,
-
+    "disabled_hooks": ["comment-checker"],
+    "disabled_skills": ["git-master"],
     // 비활성화할 에이전트 목록 (루트 레벨에 위치해야 함)
     // "disabled_agents": ["sisyphus"],
 
