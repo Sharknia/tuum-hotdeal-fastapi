@@ -36,3 +36,18 @@ After completing tasks, ALWAYS run full tests and linter checks to ensure the de
 
 - Test: `poetry run pytest`
 - Lint: `poetry run ruff check .`
+
+<available_skills>
+<skill>
+<name>feature-planner</name>
+<description>(project - Skill) Creates phase-based feature plans with quality gates and incremental delivery structure. Use when planning features, organizing work, breaking down tasks, creating roadmaps, or structuring development strategy. Keywords: plan, planning, phases, breakdown, strategy, roadmap, organize, structure, outline.</description>
+</skill>
+<skill>
+<name>commit-expert</name>
+<description>(project - Skill) (opencode - Skill) 스마트 커밋 도우미. Conventional Commits 규칙 준수(한글, 개조식, 이모지 금지) 및 main 브랜치 보호 기능을 제공합니다. 커밋 메시지 작성, 브랜치 관리, 자동 스테이징 로직을 포함합니다. "커밋해줘", "commit", "변경사항 저장" 등의 요청 시 사용합니다.</description>
+</skill>
+<skill>
+<name>skill-creator</name>
+<description>(opencode-project - Skill) Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Claude's capabilities with specialized knowledge, workflows, or tool integrations.</description>
+</skill>
+</available_skills>

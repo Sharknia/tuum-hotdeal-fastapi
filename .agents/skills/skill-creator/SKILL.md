@@ -344,7 +344,27 @@ The packaging script will:
 
 If validation fails, the script will report the errors and exit without creating a package. Fix any validation errors and run the packaging command again.
 
-### Step 6: Iterate
+### Step 6: Registering for Opencode (If applicable)
+
+If the user specifies that this is an **Opencode** skill, you MUST register it in the project's `AGENTS.md` file to make it active.
+
+1.  **Locate AGENTS.md**: usually in the project root (e.g., `/Users/crobat/dev/project/AGENTS.md`).
+2.  **Find or Create `<available_skills>`**: Look for this XML tag at the end of the file.
+3.  **Add XML Entry**: Insert the skill definition using the exact `name` and `description` from your `SKILL.md` frontmatter.
+
+```xml
+<available_skills>
+  <!-- Existing skills... -->
+  <skill>
+    <name>your-skill-name</name>
+    <description>Your skill description EXACTLY as defined in SKILL.md</description>
+  </skill>
+</available_skills>
+```
+
+**CRITICAL**: Without this registration, Opencode will not recognize the skill even if the files exist in the `.agents/skills/` directory.
+
+### Step 7: Iterate
 
 After testing the skill, users may request improvements. Often this happens right after using the skill, with fresh context of how the skill performed.
 
