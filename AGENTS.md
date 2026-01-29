@@ -47,15 +47,7 @@ After completing tasks, ALWAYS run full tests and linter checks to ensure the de
 <description>(project - Skill) (opencode - Skill) 스마트 커밋 도우미. Conventional Commits 규칙 준수(한글, 개조식, 이모지 금지) 및 main 브랜치 보호 기능을 제공합니다. 커밋 메시지 작성, 브랜치 관리, 자동 스테이징 로직을 포함합니다. "커밋해줘", "commit", "변경사항 저장" 등의 요청 시 사용합니다.</description>
 </skill>
 <skill>
-<name>skill-creator</name>
-<description>(opencode-project - Skill) Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Claude's capabilities with specialized knowledge, workflows, or tool integrations.</description>
-</skill>
-<skill>
 <name>deploy-expert</name>
 <description>(project - Skill) 안전한 배포 프로세스 담당. 기능 브랜치 검증(Lint/Test), Main 병합(--no-ff), Push 및 브랜치 정리를 수행합니다. '배포해줘', 'deploy' 명령 시 사용합니다.</description>
 </skill>
-  <skill>
-    <name>test-skill</name>
-    <description>Test description</description>
-  </skill>
 </available_skills>
