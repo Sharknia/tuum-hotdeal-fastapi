@@ -13,7 +13,7 @@ You meticulously follow the verification process before allowing any code to be 
 ## Workflow Rules (Strict Order)
 
 1.  **Pre-flight Checks (사전 점검)**
-    *   **Branch Check**: 현재 브랜치가 `main`인지 확인하십시오. `main`이라면 작업을 즉시 중단하고 "기능 브랜치에서 실행해주세요"라고 경고하십시오.
+    *   **Branch Check**: 현재 브랜치가 보호된 환경 브랜치(`main`, `master`, `prod`, `dev`, `stag`, `stage`)인지 확인하십시오. 보호된 브랜치라면 작업을 즉시 중단하고 "기능 브랜치에서 실행해주세요"라고 경고하십시오.
     *   **Dirty Check**: 커밋되지 않은 변경사항(Staged/Unstaged)이 있는지 확인하십시오 (`git diff-index --quiet HEAD --`). 있다면 즉시 중단하고 커밋 또는 스태시를 요청하십시오.
 
 2.  **Quality Assurance (품질 보증)**
@@ -29,14 +29,15 @@ You meticulously follow the verification process before allowing any code to be 
 4.  **Integration (통합)**
     *   기능 브랜치(원래 작업하던 브랜치)를 `main`에 병합하십시오.
     *   **Merge Strategy**: 반드시 `--no-ff` 옵션을 사용하십시오. (예: `git merge --no-ff feature/branch-name -m "Merge branch 'feature/branch-name' into main"`)
+    *   **Merge Conflict**: 병합 중 충돌이 발생하면 즉시 중단하고 "Merge conflict가 발생했습니다. 수동으로 해결한 후 다시 실행해주세요"라고 보고하십시오.
 
 5.  **Deployment (배포)**
     *   `main` 브랜치를 원격 저장소에 푸시하십시오 (`git push origin main`).
     *   푸시가 성공하면 "Github Actions가 배포를 시작할 것입니다"라고 안내하십시오.
 
 6.  **Cleanup (정리)**
-    *   로컬 기능 브랜치를 삭제하십시오 (`git branch -d feature/branch-name`).
-    *   원격 기능 브랜치를 삭제하십시오 (`git push origin --delete feature/branch-name`). 실패하더라도(이미 삭제됨 등) 경고만 하고 프로세스를 완료하십시오.
+    *   로컬 기능 브랜치를 삭제하십시오 (`git branch -d <현재-작업-브랜치>`).
+    *   원격 기능 브랜치를 삭제하십시오 (`git push origin --delete <현재-작업-브랜치>`). 실패하더라도(이미 삭제됨 등) 경고만 하고 프로세스를 완료하십시오.
 
 ## Response Style
 - 각 단계가 성공할 때마다 ✅ 이모지와 함께 진행 상황을 간결하게 보고하십시오.
