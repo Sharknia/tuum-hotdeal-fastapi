@@ -264,13 +264,14 @@ When creating a new skill from scratch, always run the `init_skill.py` script. T
 Usage:
 
 ```bash
-scripts/init_skill.py <skill-name> --path <output-directory>
+scripts/init_skill.py <skill-name> --desc "A concise description of what the skill does"
 ```
 
 The script:
 
-- Creates the skill directory at the specified path
-- Generates a SKILL.md template with proper frontmatter and TODO placeholders
+- Creates the skill directory in both `.claude/skills/` and `.agents/skills/`
+- Generates a SKILL.md template with proper frontmatter (using the provided description) and TODO placeholders
+- Automatically registers the skill in `AGENTS.md`
 - Creates example resource directories: `scripts/`, `references/`, and `assets/`
 - Adds example files in each directory that can be customized or deleted
 
@@ -344,25 +345,15 @@ The packaging script will:
 
 If validation fails, the script will report the errors and exit without creating a package. Fix any validation errors and run the packaging command again.
 
-### Step 6: Registering for Opencode (If applicable)
+### Step 6: Registration (Automatic)
 
-If the user specifies that this is an **Opencode** skill, you MUST register it in the project's `AGENTS.md` file to make it active.
+Registration in the project's `AGENTS.md` file is now handled automatically by the `init_skill.py` script. 
 
-1.  **Locate AGENTS.md**: usually in the project root (e.g., `/Users/crobat/dev/project/AGENTS.md`).
-2.  **Find or Create `<available_skills>`**: Look for this XML tag at the end of the file.
-3.  **Add XML Entry**: Insert the skill definition using the exact `name` and `description` from your `SKILL.md` frontmatter.
+When you initialize a skill, it will automatically:
+1. Create files in both `.claude/skills/` and `.agents/skills/` directories.
+2. Add the skill's name and description to the `<available_skills>` section in `AGENTS.md`.
 
-```xml
-<available_skills>
-  <!-- Existing skills... -->
-  <skill>
-    <name>your-skill-name</name>
-    <description>Your skill description EXACTLY as defined in SKILL.md</description>
-  </skill>
-</available_skills>
-```
-
-**CRITICAL**: Without this registration, Opencode will not recognize the skill even if the files exist in the `.agents/skills/` directory.
+Manual registration is no longer required. This ensures that the skill is immediately recognized by both standard Claude and Opencode environments.
 
 ### Step 7: Iterate
 
