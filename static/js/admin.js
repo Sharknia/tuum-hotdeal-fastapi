@@ -103,9 +103,9 @@
                 // 버튼 로직
                 let actionBtn;
                 if (user.is_active) {
-                    actionBtn = `<button class="action-btn btn-delete" onclick="unapproveUser(${user.id})">승인 해제</button>`;
+                    actionBtn = `<button class="action-btn btn-delete" onclick="unapproveUser('${user.id}')">승인 해제</button>`;
                 } else {
-                    actionBtn = `<button class="action-btn btn-approve" onclick="approveUser(${user.id})">승인</button>`;
+                    actionBtn = `<button class="action-btn btn-approve" onclick="approveUser('${user.id}')">승인</button>`;
                 }
 
                 tr.innerHTML = `
