@@ -171,9 +171,9 @@ async def get_user_info(
 async def send_new_user_notifications(admin_emails: list[str], user: UserResponse) -> None:
     subject = f"[Tuum] 신규 회원 가입: {user.nickname}"
     body = f"""새로운 회원이 가입했습니다.
- 이메일: {user.email}
- 닉네임: {user.nickname}
- 관리자: https://hotdeal.tuum.day/admin"""
+이메일: {user.email}
+닉네임: {user.nickname}
+관리자: https://hotdeal.tuum.day/admin"""
 
     for email in admin_emails:
         try:
