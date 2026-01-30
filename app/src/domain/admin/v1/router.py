@@ -1,3 +1,4 @@
+import contextlib
 from typing import Annotated
 from uuid import UUID
 
@@ -19,9 +20,11 @@ from app.src.domain.user.repositories import (
     activate_user,
     deactivate_user,
     get_all_users,
+    get_user_by_id,
     get_user_with_keywords,
 )
 from app.src.domain.user.schemas import AuthenticatedUser, UserResponse
+from app.src.domain.user.services import send_approval_notification
 from app.worker_main import job
 
 router = APIRouter(
@@ -47,9 +50,17 @@ async def approve_user(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[AuthenticatedUser, Depends(authenticate_admin_user)],
 ):
-    user = await activate_user(db, user_id)
-    if not user:
+    # 승인 전 사용자 조회 (중복 발송 방지)
+    existing_user = await get_user_by_id(db, user_id)
+    if not existing_user:
         raise AuthErrors.USER_NOT_FOUND
+
+    # 첫 승인 시에만 메일 발송 (is_active가 False일 때만)
+    if not existing_user.is_active:
+        with contextlib.suppress(Exception):
+            await send_approval_notification(existing_user.email, existing_user.nickname)
+
+    user = await activate_user(db, user_id)
     return user
 
 
