@@ -171,12 +171,30 @@ async def get_user_info(
 async def send_new_user_notifications(admin_emails: list[str], user: UserResponse) -> None:
     subject = f"[Tuum] 신규 회원 가입: {user.nickname}"
     body = f"""새로운 회원이 가입했습니다.
-이메일: {user.email}
-닉네임: {user.nickname}
-관리자: https://hotdeal.tuum.day/admin"""
+ 이메일: {user.email}
+ 닉네임: {user.nickname}
+ 관리자: https://hotdeal.tuum.day/admin"""
 
     for email in admin_emails:
         try:
             await send_email(subject=subject, to=email, body=body)
         except Exception as e:
             logger.error(f"신규 가입 알림 메일 발송 중 오류 발생 ({email}): {e}")
+
+
+async def send_approval_notification(email: str, nickname: str) -> None:
+    """
+    사용자 승인 알림 메일을 발송합니다.
+    """
+    subject = "[Tuum] 가입이 승인되었습니다"
+    body = f"""안녕하세요, {nickname}님!
+
+귀하의 가입이 승인되었습니다.
+이제 서비스를 이용하실 수 있습니다.
+
+로그인: https://hotdeal.tuum.day/login"""
+
+    try:
+        await send_email(subject=subject, to=email, body=body)
+    except Exception as e:
+        logger.error(f"승인 알림 메일 발송 중 오류 발생 ({email}): {e}")
