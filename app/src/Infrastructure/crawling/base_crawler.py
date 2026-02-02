@@ -49,7 +49,7 @@ class BaseCrawler(ABC):
         return await self._fetch_with_httpx(target_url, timeout)
 
     async def _fetch_with_httpx(self, url: str, timeout: int = 10) -> str | None:
-        logger.info(f"[{self.keyword}] 요청: {url}")
+        logger.debug(f"[{self.keyword}] 요청: {url}")
         try:
             response = await self.client.get(url, timeout=timeout)
 
@@ -62,7 +62,7 @@ class BaseCrawler(ABC):
                 return await self._fetch_with_proxy(url, timeout)
 
             response.raise_for_status()
-            logger.info(f"[{self.keyword}] 요청 성공: {url}")
+            logger.debug(f"[{self.keyword}] 요청 성공: {url}")
             return response.text
 
         except httpx.RequestError as e:
@@ -70,7 +70,7 @@ class BaseCrawler(ABC):
             return None
 
     async def _fetch_with_browser(self, url: str, wait_seconds: int = 3) -> str | None:
-        logger.info(f"[{self.keyword}] 브라우저 요청: {url}")
+        logger.debug(f"[{self.keyword}] 브라우저 요청: {url}")
         async with BrowserFetcher() as fetcher:
             return await fetcher.fetch(url, wait_seconds=wait_seconds)
 
@@ -92,7 +92,7 @@ class BaseCrawler(ABC):
                         self.proxy_manager.remove_proxy(proxy_url)
                         continue
                     elif response.status_code == 200:
-                        logger.info(f"프록시 {proxy_url}로 요청 성공")
+                        logger.debug(f"프록시 {proxy_url}로 요청 성공")
                         return response.text
 
             except httpx.RequestError as e:

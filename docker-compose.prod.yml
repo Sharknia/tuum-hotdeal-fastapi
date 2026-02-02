@@ -2,6 +2,8 @@ services:
   web:
     image: ghcr.io/sharknia/tuum-hotdeal-fastapi:latest
     container_name: tuum-hotdeal-api
+    mem_limit: 1g
+    mem_reservation: 256m
     environment:
       - DOPPLER_TOKEN=${DOPPLER_TOKEN}
     ports:
@@ -11,11 +13,9 @@ services:
   worker:
     image: ghcr.io/sharknia/tuum-hotdeal-fastapi:latest
     container_name: tuum-hotdeal-worker
+    mem_limit: 4g
+    mem_reservation: 2g
     environment:
       - DOPPLER_TOKEN=${DOPPLER_TOKEN}
     command: ["doppler", "run", "--", "python", "app/worker_main.py"]
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 4G

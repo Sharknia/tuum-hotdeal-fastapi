@@ -53,7 +53,7 @@ class BrowserFetcher:
                 )
 
                 page = await context.new_page()
-                logger.info(f"[BrowserFetcher] 요청: {url}")
+                logger.debug(f"[BrowserFetcher] 요청: {url}")
 
                 await page.goto(url, wait_until="domcontentloaded", timeout=30000)
                 await page.wait_for_timeout(wait_seconds * 1000)
@@ -63,7 +63,7 @@ class BrowserFetcher:
                 for attempt in range(self.max_challenge_retries):
                     if not self._is_challenge_page(html):
                         break
-                    logger.info(
+                    logger.debug(
                         f"[BrowserFetcher] 챌린지 감지, 재시도 {attempt + 1}/{self.max_challenge_retries}"
                     )
                     await page.wait_for_timeout(3000)
@@ -73,7 +73,7 @@ class BrowserFetcher:
                     logger.warning("[BrowserFetcher] 챌린지 페이지 통과 실패")
                     return None
 
-                logger.info(f"[BrowserFetcher] 요청 성공: {url} ({len(html)} bytes)")
+                logger.debug(f"[BrowserFetcher] 요청 성공: {url} ({len(html)} bytes)")
                 return html
 
             finally:

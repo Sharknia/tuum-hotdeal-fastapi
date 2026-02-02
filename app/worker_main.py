@@ -66,7 +66,7 @@ async def handle_keyword(
     """
     단일 키워드를 모든 활성 사이트에서 크롤링하고, 신규 핫딜이 있는 경우 결과를 반환합니다.
     """
-    logger.info(f"[INFO] 키워드 처리: [{keyword.title}]")
+    logger.debug(f"[DEBUG] 키워드 처리: [{keyword.title}]")
 
     # 활성 사이트 목록을 한 번만 조회 (일관성 보장)
     active_sites = get_active_sites()
@@ -97,12 +97,12 @@ async def handle_keyword(
             all_deals.extend(res)
 
     if all_deals:
-        logger.info(
-            f"[INFO] 키워드 처리: [{keyword.title}] 신규 핫딜 {len(all_deals)}건 발견"
+        logger.debug(
+            f"[DEBUG] 키워드 처리: [{keyword.title}] 신규 핫딜 {len(all_deals)}건 발견"
         )
         return keyword, all_deals
     else:
-        logger.info(f"[INFO] 키워드 처리: [{keyword.title}] 크롤링 결과 없음")
+        logger.debug(f"[DEBUG] 키워드 처리: [{keyword.title}] 크롤링 결과 없음")
         return None
 
 
@@ -259,7 +259,7 @@ async def job():
             return  # DB 조회 실패 시 작업 중단
 
         if not keywords_to_process:
-            logger.info("[INFO] 처리할 활성 키워드가 없습니다.")
+            logger.debug("[DEBUG] 처리할 활성 키워드가 없습니다.")
             return
 
         PROXY_MANAGER.reset_proxies()
@@ -267,10 +267,10 @@ async def job():
 
         id_to_crawled_keyword: dict[Keyword, list[CrawledKeyword]] = {}
 
-        # 사이트별 동시 실행 개수를 2개로 제한하는 세마포어 생성
-        site_semaphores = {site: asyncio.Semaphore(2) for site in get_active_sites()}
-        # 키워드별 동시 실행 개수를 5개로 제한하는 세마포어
-        keyword_semaphore = asyncio.Semaphore(5)
+        # 사이트별 동시 실행 개수를 1개로 제한하는 세마포어 생성
+        site_semaphores = {site: asyncio.Semaphore(1) for site in get_active_sites()}
+        # 키워드별 동시 실행 개수를 2개로 제한하는 세마포어
+        keyword_semaphore = asyncio.Semaphore(2)
 
         async with httpx.AsyncClient() as client:
             # 각 키워드를 세마포어 제어 하에 처리하는 태스크 리스트 생성
@@ -297,7 +297,7 @@ async def job():
                 total_items_found += len(deals)
                 id_to_crawled_keyword[keyword] = deals
 
-        logger.info("[INFO] 모든 키워드 크롤링 완료. 메일 발송 시작...")
+        logger.debug("[DEBUG] 모든 키워드 크롤링 완료. 메일 발송 시작...")
 
         # 사용자별 메일 발송 로직
         email_tasks = []
