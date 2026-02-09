@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      force_deploy:
+        description: "Force deploy even if no backend changes are detected"
+        required: false
+        type: boolean
+        default: false
 
 env:
   REGISTRY: ghcr.io
@@ -14,13 +20,14 @@ jobs:
     name: Detect Changes
     runs-on: ubuntu-latest
     outputs:
-      frontend: ${{ steps.filter.outputs.frontend }}
-      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend || steps.force.outputs.frontend }}
+      backend: ${{ steps.filter.outputs.backend || steps.force.outputs.backend }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Filter paths
         id: filter
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.force_deploy == true) }}
         uses: dorny/paths-filter@v3
         with:
           filters: |
@@ -39,6 +46,13 @@ jobs:
               - 'alembic.ini'
               - 'pyrightconfig.json'
               - 'pytest.ini'
+
+      - name: Force backend deploy
+        id: force
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.force_deploy == true }}
+        run: |
+          echo "frontend=false" >> "$GITHUB_OUTPUT"
+          echo "backend=true" >> "$GITHUB_OUTPUT"
 
   lint:
     name: Lint
@@ -157,10 +171,9 @@ jobs:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
           DEPLOY_PATH: ~/app/tuum-hotdeal-fastapi
         run: |
-          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-          ssh $SSH_OPTS ${SSH_USER}@${SSH_HOST} "mkdir -p ${DEPLOY_PATH}"
-          scp $SSH_OPTS docker-compose.prod.yml ${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/
-          ssh $SSH_OPTS ${SSH_USER}@${SSH_HOST} << EOF
+          ssh ${SSH_USER}@${SSH_HOST} "mkdir -p ${DEPLOY_PATH}"
+          scp docker-compose.prod.yml ${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/
+          ssh ${SSH_USER}@${SSH_HOST} << EOF
             cd ${DEPLOY_PATH}
             export DOPPLER_TOKEN=${DOPPLER_TOKEN}
             SERVICE_NAME="tuum-hotdeal-api"

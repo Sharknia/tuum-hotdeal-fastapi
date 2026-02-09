@@ -41,5 +41,5 @@ class Settings(BaseSettings):
     )
 
 
-# 설정 인스턴스 생성 (이 시점에 .env 파일 로드 시도)
+# 설정 인스턴스 생성 (이 시점에 .env 파일 로드 시도, 무해한 주석 변경)
 settings = Settings()
