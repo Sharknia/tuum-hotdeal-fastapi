@@ -157,9 +157,10 @@ jobs:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
           DEPLOY_PATH: ~/app/tuum-hotdeal-fastapi
         run: |
-          ssh ${SSH_USER}@${SSH_HOST} "mkdir -p ${DEPLOY_PATH}"
-          scp docker-compose.prod.yml ${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/
-          ssh ${SSH_USER}@${SSH_HOST} << EOF
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+          ssh $SSH_OPTS ${SSH_USER}@${SSH_HOST} "mkdir -p ${DEPLOY_PATH}"
+          scp $SSH_OPTS docker-compose.prod.yml ${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/
+          ssh $SSH_OPTS ${SSH_USER}@${SSH_HOST} << EOF
             cd ${DEPLOY_PATH}
             export DOPPLER_TOKEN=${DOPPLER_TOKEN}
             SERVICE_NAME="tuum-hotdeal-api"
