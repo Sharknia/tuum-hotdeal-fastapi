@@ -57,7 +57,7 @@ jobs:
   lint:
     name: Lint
     needs: changes
-    if: ${{ needs.changes.outputs.backend == 'true' && needs.changes.outputs.frontend != 'true' }}
+    if: ${{ needs.changes.outputs.backend == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -80,7 +80,7 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     needs: changes
-    if: ${{ needs.changes.outputs.backend == 'true' && needs.changes.outputs.frontend != 'true' }}
+    if: ${{ needs.changes.outputs.backend == 'true' }}
     env:
       DATABASE_URL: "sqlite+aiosqlite:///:memory:"
       REFRESH_TOKEN_SECRET_KEY: test-refresh-secret-key

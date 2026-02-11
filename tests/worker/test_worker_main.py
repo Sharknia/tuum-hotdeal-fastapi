@@ -1,10 +1,11 @@
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.src.domain.admin.models import WorkerLog, WorkerStatus
 from app.src.domain.hotdeal.enums import SiteName
 from app.src.domain.hotdeal.models import Keyword, KeywordSite
 from app.src.domain.hotdeal.schemas import CrawledKeyword
@@ -222,6 +223,57 @@ async def test_job_e2e(mock_db_session, keyword_in_db):
         assert kwargs["to"] == "test@example.com"
         assert "테스트키워드" in kwargs["subject"]
         assert "[새상품] 키보드" in kwargs["body"]
+
+
+@pytest.mark.asyncio
+async def test_job_marks_success_when_no_keywords(mock_db_session):
+    """키워드가 없을 때도 worker log가 SUCCESS로 종료되어야 한다."""
+
+    mock_response = AsyncMock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = Mock()
+
+    with (
+        patch("app.worker_main.AsyncSessionLocal", return_value=mock_db_session),
+        patch("app.worker_main.SharedBrowser") as mock_shared,
+        patch("app.worker_main.httpx.AsyncClient.get", return_value=mock_response),
+    ):
+        mock_shared.get_instance.return_value.start = AsyncMock()
+        mock_shared.get_instance.return_value.stop = AsyncMock()
+
+        await job()
+
+    result = await mock_db_session.execute(select(WorkerLog).order_by(WorkerLog.id.desc()))
+    latest_log = result.scalars().first()
+
+    assert latest_log is not None
+    assert latest_log.status == WorkerStatus.SUCCESS
+    assert latest_log.items_found == 0
+
+
+@pytest.mark.asyncio
+async def test_job_marks_fail_when_browser_start_fails(mock_db_session):
+    """브라우저 시작 실패 시 worker log가 FAIL로 종료되어야 한다."""
+
+    with (
+        patch("app.worker_main.AsyncSessionLocal", return_value=mock_db_session),
+        patch("app.worker_main.SharedBrowser") as mock_shared,
+    ):
+        mock_shared.get_instance.return_value.start = AsyncMock(
+            side_effect=RuntimeError("browser start failed")
+        )
+        mock_shared.get_instance.return_value.stop = AsyncMock()
+
+        with pytest.raises(RuntimeError, match="browser start failed"):
+            await job()
+
+    result = await mock_db_session.execute(select(WorkerLog).order_by(WorkerLog.id.desc()))
+    latest_log = result.scalars().first()
+
+    assert latest_log is not None
+    assert latest_log.status == WorkerStatus.FAIL
+    assert "browser start failed" in (latest_log.message or "")
+    assert latest_log.details
 
 
 # --- Phase 3: 멀티사이트 지원 테스트 ---

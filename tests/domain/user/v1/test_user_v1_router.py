@@ -5,6 +5,20 @@ from app.src.core.exceptions.auth_excptions import AuthErrors
 from app.src.domain.user.schemas import LogoutResponse
 
 
+def _assert_auth_error_response(response: Response, auth_error) -> None:
+    assert response.status_code == auth_error.status_code
+    assert response.json() == {
+        "description": auth_error.description,
+        "detail": auth_error.detail,
+    }
+
+
+def _get_openapi_get_responses(mock_client, path: str) -> dict:
+    response: Response = mock_client.get("/openapi.json")
+    assert response.status_code == 200
+    return response.json()["paths"][path]["get"]["responses"]
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "request_data, expected_status, mock_side_effect, expected_response",
@@ -212,3 +226,64 @@ async def test_post_user_logout(
     # 응답 검증
     assert response.status_code == 200
     assert response.json() == {"message": "Logout successful"}
+
+
+@pytest.mark.asyncio
+async def test_get_me_inactive_user_returns_401(
+    mocker,
+    mock_client,
+    mock_authenticated_user,
+    override_registered_user,
+    override_authenticate_user,
+):
+    override_registered_user(mock_authenticated_user)
+    override_authenticate_user(error=AuthErrors.USER_NOT_ACTIVE)
+
+    mocker.patch(
+        "app.src.domain.user.v1.router.get_user_info",
+        return_value={
+            "id": "00000000-0000-0000-0000-00000000000a",
+            "email": "test@example.com",
+            "nickname": "test_user",
+            "is_active": True,
+            "auth_level": 1,
+            "last_login": None,
+            "created_at": "2024-12-31T12:00:00Z",
+        },
+    )
+
+    response: Response = mock_client.get("/api/user/v1/me")
+
+    _assert_auth_error_response(response, AuthErrors.USER_NOT_ACTIVE)
+
+
+@pytest.mark.asyncio
+async def test_logout_keeps_registered_user_dependency(
+    mocker,
+    mock_authenticated_user,
+    override_registered_user,
+    override_authenticate_user,
+    mock_client,
+):
+    override_registered_user(mock_authenticated_user)
+    override_authenticate_user(error=AuthErrors.USER_NOT_ACTIVE)
+
+    mocker.patch(
+        "app.src.domain.user.v1.router.logout_user",
+        return_value=LogoutResponse(),
+    )
+
+    response: Response = mock_client.post(
+        "/api/user/v1/logout",
+        headers={"Authorization": "Bearer some_refresh_token"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"message": "Logout successful"}
+
+
+def test_get_me_openapi_includes_auth_error_response(mock_client):
+    responses = _get_openapi_get_responses(mock_client, "/api/user/v1/me")
+
+    assert "200" in responses
+    assert "401" in responses

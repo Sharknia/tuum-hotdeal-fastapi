@@ -3,8 +3,17 @@ from datetime import datetime
 import pytest
 from fastapi import Response
 
+from app.src.core.exceptions.auth_excptions import AuthErrors
 from app.src.core.exceptions.client_exceptions import ClientErrors
 from app.src.domain.hotdeal.schemas import KeywordResponse
+
+
+def _assert_auth_error_response(response: Response, auth_error) -> None:
+    assert response.status_code == auth_error.status_code
+    assert response.json() == {
+        "description": auth_error.description,
+        "detail": auth_error.detail,
+    }
 
 
 @pytest.mark.asyncio
@@ -43,7 +52,7 @@ async def test_post_keyword(
     mocker,
     mock_client,
     mock_authenticated_user,
-    override_registered_user,
+    override_authenticate_user,
     request_data,
     expected_status,
     mock_side_effect,
@@ -51,7 +60,7 @@ async def test_post_keyword(
 ):
     """키워드 등록 API 테스트"""
     # 테스트용 인증 유저 오버라이드
-    override_registered_user(mock_authenticated_user)
+    override_authenticate_user(mock_authenticated_user)
 
     if mock_side_effect:
         mocker.patch(
@@ -104,7 +113,7 @@ async def test_delete_my_keyword(
     mocker,
     mock_client,
     mock_authenticated_user,
-    override_registered_user,
+    override_authenticate_user,
     keyword_id,
     expected_status,
     mock_side_effect,
@@ -112,7 +121,7 @@ async def test_delete_my_keyword(
 ):
     """내 키워드 삭제 API 테스트"""
     # 테스트용 인증 유저 오버라이드
-    override_registered_user(mock_authenticated_user)
+    override_authenticate_user(mock_authenticated_user)
 
     if mock_side_effect:
         mocker.patch(
@@ -140,11 +149,11 @@ async def test_get_my_keywords_list(
     mocker,
     mock_client,
     mock_authenticated_user,
-    override_registered_user,
+    override_authenticate_user,
 ):
     """내 키워드 리스트 조회 API 테스트"""
     # 테스트용 인증 유저 오버라이드
-    override_registered_user(mock_authenticated_user)
+    override_authenticate_user(mock_authenticated_user)
 
     mocker.patch(
         "app.src.domain.hotdeal.v1.router.view_users_keywords",
@@ -208,3 +217,69 @@ class TestGetSitesEndpoint:
 
         # then
         assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_post_keyword_inactive_user_returns_401(
+    mocker,
+    mock_client,
+    mock_authenticated_user,
+    override_registered_user,
+    override_authenticate_user,
+):
+    override_registered_user(mock_authenticated_user)
+    override_authenticate_user(error=AuthErrors.USER_NOT_ACTIVE)
+
+    mocker.patch(
+        "app.src.domain.hotdeal.v1.router.register_keyword",
+        return_value=KeywordResponse(id=1, title="keyword", wdate=datetime.now()),
+    )
+
+    response: Response = mock_client.post(
+        "/api/hotdeal/v1/keywords",
+        json={"title": "keyword"},
+    )
+
+    _assert_auth_error_response(response, AuthErrors.USER_NOT_ACTIVE)
+
+
+@pytest.mark.asyncio
+async def test_delete_keyword_inactive_user_returns_401(
+    mocker,
+    mock_client,
+    mock_authenticated_user,
+    override_registered_user,
+    override_authenticate_user,
+):
+    override_registered_user(mock_authenticated_user)
+    override_authenticate_user(error=AuthErrors.USER_NOT_ACTIVE)
+
+    mocker.patch(
+        "app.src.domain.hotdeal.v1.router.unlink_keyword",
+        return_value=None,
+    )
+
+    response: Response = mock_client.delete("/api/hotdeal/v1/keywords/1")
+
+    _assert_auth_error_response(response, AuthErrors.USER_NOT_ACTIVE)
+
+
+@pytest.mark.asyncio
+async def test_get_keywords_inactive_user_returns_401(
+    mocker,
+    mock_client,
+    mock_authenticated_user,
+    override_registered_user,
+    override_authenticate_user,
+):
+    override_registered_user(mock_authenticated_user)
+    override_authenticate_user(error=AuthErrors.USER_NOT_ACTIVE)
+
+    mocker.patch(
+        "app.src.domain.hotdeal.v1.router.view_users_keywords",
+        return_value=[KeywordResponse(id=1, title="keyword", wdate=datetime.now())],
+    )
+
+    response: Response = mock_client.get("/api/hotdeal/v1/keywords")
+
+    _assert_auth_error_response(response, AuthErrors.USER_NOT_ACTIVE)

@@ -3,7 +3,11 @@ from typing import Annotated
 from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.src.core.dependencies.auth import authenticate_refresh_token, registered_user
+from app.src.core.dependencies.auth import (
+    authenticate_refresh_token,
+    authenticate_user,
+    registered_user,
+)
 from app.src.core.dependencies.db_session import get_db
 from app.src.core.exceptions.auth_excptions import AuthErrors
 from app.src.core.logger import logger
@@ -164,10 +168,13 @@ async def refresh_token(
     response_model=UserResponse,
     status_code=status.HTTP_200_OK,
     summary="내 정보 가져오기",
+    responses=create_responses(
+        AuthErrors.NOT_AUTHENTICATED,
+    ),
 )
 async def get_me(
     db: Annotated[AsyncSession, Depends(get_db)],
-    login_user: Annotated[AuthenticatedUser, Depends(registered_user)],
+    login_user: Annotated[AuthenticatedUser, Depends(authenticate_user)],
 ) -> UserResponse:
     """
     내 정보 가져오기

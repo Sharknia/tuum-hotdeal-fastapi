@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.src.core.dependencies.auth import registered_user
+from app.src.core.dependencies.auth import authenticate_user
 from app.src.core.dependencies.db_session import get_db
 from app.src.core.exceptions.auth_excptions import AuthErrors
 from app.src.core.exceptions.client_exceptions import ClientErrors
@@ -38,7 +38,7 @@ router = APIRouter(prefix="/v1", tags=["hotdeal"])
 async def post_keyword(
     request: KeywordCreateRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
-    login_user: Annotated[AuthenticatedUser, Depends(registered_user)],
+    login_user: Annotated[AuthenticatedUser, Depends(authenticate_user)],
 ) -> KeywordResponse:
     result: KeywordResponse = await register_keyword(
         db=db,
@@ -64,7 +64,7 @@ async def post_keyword(
 async def delete_my_keyword(
     keyword_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
-    login_user: Annotated[AuthenticatedUser, Depends(registered_user)],
+    login_user: Annotated[AuthenticatedUser, Depends(authenticate_user)],
 ) -> None:
     await unlink_keyword(db=db, keyword_id=keyword_id, user_id=login_user.user_id)
     return
@@ -84,7 +84,7 @@ async def delete_my_keyword(
 )
 async def get_my_keywords_list(
     db: Annotated[AsyncSession, Depends(get_db)],
-    login_user: Annotated[AuthenticatedUser, Depends(registered_user)],
+    login_user: Annotated[AuthenticatedUser, Depends(authenticate_user)],
 ) -> list[KeywordResponse]:
     result: list[KeywordResponse] = await view_users_keywords(
         db=db,

@@ -219,9 +219,13 @@ async def job():
     except Exception as e:
         logger.error(f"Failed to create worker log: {e}")
 
-    await SharedBrowser.get_instance().start()
     total_items_found = 0
     try:
+        try:
+            await SharedBrowser.get_instance().start()
+        except Exception as e:
+            raise RuntimeError(f"Worker setup failed: browser start failed: {e}") from e
+
         # Supabase DB 활성화를 위한 주기적인 호출
         try:
             async with httpx.AsyncClient() as client:
@@ -256,117 +260,116 @@ async def job():
                 all_users_with_keywords = user_result.scalars().unique().all()
         except Exception as e:
             logger.error(f"DB 조회 중 오류 발생: {e}")
-            return  # DB 조회 실패 시 작업 중단
+            raise RuntimeError(f"Worker setup failed: DB 조회 중 오류 발생: {e}") from e
 
         if not keywords_to_process:
             logger.debug("[DEBUG] 처리할 활성 키워드가 없습니다.")
-            return
+        else:
+            PROXY_MANAGER.reset_proxies()
+            PROXY_MANAGER.fetch_proxies()
 
-        PROXY_MANAGER.reset_proxies()
-        PROXY_MANAGER.fetch_proxies()
+            id_to_crawled_keyword: dict[Keyword, list[CrawledKeyword]] = {}
 
-        id_to_crawled_keyword: dict[Keyword, list[CrawledKeyword]] = {}
+            # 사이트별 동시 실행 개수를 1개로 제한하는 세마포어 생성
+            site_semaphores = {site: asyncio.Semaphore(1) for site in get_active_sites()}
+            # 키워드별 동시 실행 개수를 2개로 제한하는 세마포어
+            keyword_semaphore = asyncio.Semaphore(2)
 
-        # 사이트별 동시 실행 개수를 1개로 제한하는 세마포어 생성
-        site_semaphores = {site: asyncio.Semaphore(1) for site in get_active_sites()}
-        # 키워드별 동시 실행 개수를 2개로 제한하는 세마포어
-        keyword_semaphore = asyncio.Semaphore(2)
+            async with httpx.AsyncClient() as client:
+                # 각 키워드를 세마포어 제어 하에 처리하는 태스크 리스트 생성
+                async def sem_handle_keyword(keyword: Keyword):
+                    async with keyword_semaphore:
+                        # 세마포어 내에서도 짧은 랜덤 딜레이를 주면 부하를 더 분산시킬 수 있습니다.
+                        await asyncio.sleep(random.uniform(0.5, 1.5))
+                        return await handle_keyword(keyword, client, site_semaphores)
 
-        async with httpx.AsyncClient() as client:
-            # 각 키워드를 세마포어 제어 하에 처리하는 태스크 리스트 생성
-            async def sem_handle_keyword(keyword: Keyword):
-                async with keyword_semaphore:
-                    # 세마포어 내에서도 짧은 랜덤 딜레이를 주면 부하를 더 분산시킬 수 있습니다.
-                    await asyncio.sleep(random.uniform(0.5, 1.5))
-                    return await handle_keyword(keyword, client, site_semaphores)
+                tasks = [sem_handle_keyword(kw) for kw in keywords_to_process]
 
-            tasks = [sem_handle_keyword(kw) for kw in keywords_to_process]
+                # asyncio.gather로 모든 작업을 동시에 실행 (세마포어가 동시성 제어)
+                # return_exceptions=True를 통해 일부 작업이 실패해도 전체가 중단되지 않도록 함
+                results = await asyncio.gather(*tasks, return_exceptions=True)
 
-            # asyncio.gather로 모든 작업을 동시에 실행 (세마포어가 동시성 제어)
-            # return_exceptions=True를 통해 일부 작업이 실패해도 전체가 중단되지 않도록 함
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+            # 결과 처리
+            for i, res in enumerate(results):
+                if isinstance(res, Exception):
+                    # 실패한 경우, 어떤 키워드에서 오류가 났는지 로깅
+                    failed_keyword = keywords_to_process[i]
+                    logger.error(f"키워드 '[{failed_keyword.title}]' 처리 중 오류 발생: {res}")
+                elif res:
+                    keyword, deals = res
+                    total_items_found += len(deals)
+                    id_to_crawled_keyword[keyword] = deals
 
-        # 결과 처리
-        for i, res in enumerate(results):
-            if isinstance(res, Exception):
-                # 실패한 경우, 어떤 키워드에서 오류가 났는지 로깅
-                failed_keyword = keywords_to_process[i]
-                logger.error(f"키워드 '[{failed_keyword.title}]' 처리 중 오류 발생: {res}")
-            elif res:
-                keyword, deals = res
-                total_items_found += len(deals)
-                id_to_crawled_keyword[keyword] = deals
+            logger.debug("[DEBUG] 모든 키워드 크롤링 완료. 메일 발송 시작...")
 
-        logger.debug("[DEBUG] 모든 키워드 크롤링 완료. 메일 발송 시작...")
+            # 사용자별 메일 발송 로직
+            email_tasks = []
+            for user in all_users_with_keywords:
+                try:
+                    user_deals: dict[Keyword, list[CrawledKeyword]] = {}
+                    # 사용자가 구독한 Keyword 객체들을 set으로 만들어 빠른 조회를 지원
+                    subscribed_keywords_set = set(user.keywords)
 
-        # 사용자별 메일 발송 로직
-        email_tasks = []
-        for user in all_users_with_keywords:
-            try:
-                user_deals: dict[Keyword, list[CrawledKeyword]] = {}
-                # 사용자가 구독한 Keyword 객체들을 set으로 만들어 빠른 조회를 지원
-                subscribed_keywords_set = set(user.keywords)
+                    # 사용자가 구독한 키워드 중 크롤링된 결과가 있는지 확인
+                    for crawled_keyword_obj, deals in id_to_crawled_keyword.items():
+                        if crawled_keyword_obj in subscribed_keywords_set:
+                            user_deals[crawled_keyword_obj] = deals
 
-                # 사용자가 구독한 키워드 중 크롤링된 결과가 있는지 확인
-                for crawled_keyword_obj, deals in id_to_crawled_keyword.items():
-                    if crawled_keyword_obj in subscribed_keywords_set:
-                        user_deals[crawled_keyword_obj] = deals
+                    if user_deals:
+                        # 메일 내용 생성
+                        email_content: str = ""
+                        subject: str = ""
+                        for keyword, deals in user_deals.items():
+                            try:
+                                email_content += await make_hotdeal_email_content(
+                                    keyword, deals
+                                )
+                                subject += f"{keyword.title}, "
+                            except Exception as e:
+                                logger.error(
+                                    f"사용자 {user.email}, 키워드 {keyword.title} 메일 내용 생성 중 오류: {e}"
+                                )
+                                # 내용 생성 실패 시 해당 키워드는 건너뛰고 계속 진행
+                                continue
 
-                if user_deals:
-                    # 메일 내용 생성
-                    email_content: str = ""
-                    subject: str = ""
-                    for keyword, deals in user_deals.items():
-                        try:
-                            email_content += await make_hotdeal_email_content(
-                                keyword, deals
+                        if not email_content:
+                            # 모든 키워드에서 내용 생성 실패 시 메일 발송 안함
+                            logger.info(
+                                f"[INFO] 사용자 {user.email} 에게 발송할 유효한 메일 내용 없음"
                             )
-                            subject += f"{keyword.title}, "
-                        except Exception as e:
-                            logger.error(
-                                f"사용자 {user.email}, 키워드 {keyword.title} 메일 내용 생성 중 오류: {e}"
-                            )
-                            # 내용 생성 실패 시 해당 키워드는 건너뛰고 계속 진행
                             continue
 
-                    if not email_content:
-                        # 모든 키워드에서 내용 생성 실패 시 메일 발송 안함
-                        logger.info(
-                            f"[INFO] 사용자 {user.email} 에게 발송할 유효한 메일 내용 없음"
-                        )
-                        continue
+                        subject = subject.rstrip(", ")  # 마지막 쉼표 및 공백 제거
+                        subject = f"[{subject}] 새로운 핫딜 알림"
 
-                    subject = subject.rstrip(", ")  # 마지막 쉼표 및 공백 제거
-                    subject = f"[{subject}] 새로운 핫딜 알림"
+                        if settings.ENVIRONMENT == "prod":
+                            task = send_email(
+                                subject=subject,
+                                to=user.email,
+                                body=email_content,
+                                is_html=True,
+                            )
+                            email_tasks.append(task)
+                            # 메일 발송 성공 로그 (선택적)
+                            # logger.info(f"사용자 {user.email} 에게 메일 발송 완료.")
+                        else:
+                            logger.info(
+                                f"[DEV] 사용자 {user.email} 에게 메일 발송 제목:{subject} 내용:{email_content}"
+                            )
+                    # else:
+                    # 발송할 딜 없는 경우 로그는 위에서 처리했으므로 주석처리 또는 제거
+                    # print(f"[INFO] 사용자 {user.email} 에게 발송할 새 핫딜 없음")
+                except Exception as e:
+                    # 사용자별 메일 처리 루프 전체에서 예외 발생 시 로깅
+                    logger.error(f"사용자 {user.email} 메일 처리 중 오류 발생: {e}")
+                    # 다음 사용자로 계속 진행
+                    continue
 
-                    if settings.ENVIRONMENT == "prod":
-                        task = send_email(
-                            subject=subject,
-                            to=user.email,
-                            body=email_content,
-                            is_html=True,
-                        )
-                        email_tasks.append(task)
-                        # 메일 발송 성공 로그 (선택적)
-                        # logger.info(f"사용자 {user.email} 에게 메일 발송 완료.")
-                    else:
-                        logger.info(
-                            f"[DEV] 사용자 {user.email} 에게 메일 발송 제목:{subject} 내용:{email_content}"
-                        )
-                # else:
-                # 발송할 딜 없는 경우 로그는 위에서 처리했으므로 주석처리 또는 제거
-                # print(f"[INFO] 사용자 {user.email} 에게 발송할 새 핫딜 없음")
-            except Exception as e:
-                # 사용자별 메일 처리 루프 전체에서 예외 발생 시 로깅
-                logger.error(f"사용자 {user.email} 메일 처리 중 오류 발생: {e}")
-                # 다음 사용자로 계속 진행
-                continue
+            if email_tasks:
+                await asyncio.gather(*email_tasks)
 
-        if email_tasks:
-            await asyncio.gather(*email_tasks)
-
-        # 작업이 완료되면 지역 변수인 id_to_crawled_keyword는 자동으로 사라집니다.
-        logger.info("[INFO] 메일 발송 완료 및 크롤링 결과 초기화")
+            # 작업이 완료되면 지역 변수인 id_to_crawled_keyword는 자동으로 사라집니다.
+            logger.info("[INFO] 메일 발송 완료 및 크롤링 결과 초기화")
 
         if log_id:
             try:
