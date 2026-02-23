@@ -18,9 +18,17 @@ wait_for_db() {
     DB_HOST=${db_host:-db}
     DB_PORT=${db_port:-5432}
 
-    echo "Waiting for database at $DB_HOST:$DB_PORT (from DATABASE_URL)..."
+    DB_WAIT_TIMEOUT=${DB_WAIT_TIMEOUT:-180}
+    elapsed=0
+
+    echo "Waiting for database at $DB_HOST:$DB_PORT (from DATABASE_URL, timeout=${DB_WAIT_TIMEOUT}s)..."
     while ! nc -z $DB_HOST $DB_PORT; do
+        if [ "$elapsed" -ge "$DB_WAIT_TIMEOUT" ]; then
+            echo "Database wait timeout after ${DB_WAIT_TIMEOUT}s: $DB_HOST:$DB_PORT"
+            exit 1
+        fi
         sleep 1
+        elapsed=$((elapsed + 1))
     done
     echo "Database $DB_HOST:$DB_PORT is ready."
 }
@@ -28,9 +36,12 @@ wait_for_db() {
 # Wait for the database to be ready
 wait_for_db
 
-# Run database migrations
-echo "Running database migrations..."
-PYTHONPATH=/app alembic upgrade head
+if [ "${RUN_DB_MIGRATIONS:-0}" = "1" ]; then
+    echo "Running database migrations..."
+    PYTHONPATH=/app alembic upgrade head
+else
+    echo "Skipping database migrations (RUN_DB_MIGRATIONS=${RUN_DB_MIGRATIONS:-0})"
+fi
 
 # Start the application
 echo "Starting application..."
