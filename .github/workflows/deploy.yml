@@ -183,26 +183,32 @@ jobs:
               PREV_IMAGE_ID=\$(docker inspect --format='{{.Image}}' \${SERVICE_NAME})
             fi
             docker compose -f docker-compose.prod.yml pull
+            echo "Running pre-deploy migrations..."
+            docker compose -f docker-compose.prod.yml run --rm --no-deps -e RUN_DB_MIGRATIONS=1 web doppler run -- /app/entrypoint.sh true
             docker compose -f docker-compose.prod.yml up -d --force-recreate
-            MAX_RETRIES=12
-            SLEEP_SECONDS=10
-            STATUS=""
+            MAX_RETRIES=60
+            SLEEP_SECONDS=5
+            HEALTH_OK=false
             for i in \$(seq 1 \${MAX_RETRIES}); do
-              STATUS=\$(docker inspect --format='{{.State.Health.Status}}' \${SERVICE_NAME} 2>/dev/null || true)
-              if [ "\${STATUS}" = "healthy" ]; then
+              if docker exec \${SERVICE_NAME} sh -lc "curl -fsS http://localhost:8000/health >/dev/null"; then
+                HEALTH_OK=true
                 echo "Healthcheck OK (\${SERVICE_NAME})"
                 break
               fi
-              if [ "\${STATUS}" = "unhealthy" ]; then
-                echo "Healthcheck FAILED (\${SERVICE_NAME})"
-                break
+
+              STATUS=\$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \${SERVICE_NAME} 2>/dev/null || true)
+              echo "Waiting for healthcheck... (\${i}/\${MAX_RETRIES}, status=\${STATUS})"
+              if [ \$((i % 6)) -eq 0 ]; then
+                docker logs --tail 20 \${SERVICE_NAME} || true
               fi
-              echo "Waiting for healthcheck... (\${i}/\${MAX_RETRIES})"
               sleep \${SLEEP_SECONDS}
             done
 
-            if [ "\${STATUS}" != "healthy" ]; then
+            if [ "\${HEALTH_OK}" != "true" ]; then
               echo "Deploy failed: healthcheck did not pass."
+              docker ps -a --filter "name=\${SERVICE_NAME}" || true
+              docker inspect --format='{{json .State.Health}}' \${SERVICE_NAME} || true
+              docker logs --tail 200 \${SERVICE_NAME} || true
               if [ -n "\${PREV_IMAGE_ID}" ]; then
                 echo "Rolling back to previous image: \${PREV_IMAGE_ID}"
                 docker tag "\${PREV_IMAGE_ID}" "\${IMAGE_NAME}"
