@@ -184,8 +184,8 @@ jobs:
             fi
             docker compose -f docker-compose.prod.yml pull
             docker compose -f docker-compose.prod.yml up -d --force-recreate
-            MAX_RETRIES=20
-            SLEEP_SECONDS=5
+            MAX_RETRIES=12
+            SLEEP_SECONDS=10
             STATUS=""
             for i in \$(seq 1 \${MAX_RETRIES}); do
               STATUS=\$(docker inspect --format='{{.State.Health.Status}}' \${SERVICE_NAME} 2>/dev/null || true)
