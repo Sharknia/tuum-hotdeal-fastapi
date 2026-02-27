@@ -185,7 +185,7 @@ jobs:
             fi
             docker compose -f docker-compose.prod.yml pull
             echo "Running pre-deploy migrations..."
-            docker compose -f docker-compose.prod.yml run -T --rm --no-deps -e RUN_DB_MIGRATIONS=1 web doppler run -- /app/entrypoint.sh true
+            docker compose -f docker-compose.prod.yml run -T --rm --no-deps -e RUN_DB_MIGRATIONS=1 web doppler run -- /app/entrypoint.sh true </dev/null
             docker compose -f docker-compose.prod.yml up -d --force-recreate
             MAX_RETRIES=60
             SLEEP_SECONDS=5
