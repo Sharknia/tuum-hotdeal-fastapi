@@ -175,6 +175,7 @@ jobs:
           scp docker-compose.prod.yml ${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/
           ssh ${SSH_USER}@${SSH_HOST} << EOF
             cd ${DEPLOY_PATH}
+            set -euo pipefail
             export DOPPLER_TOKEN=${DOPPLER_TOKEN}
             SERVICE_NAME="tuum-hotdeal-api"
             IMAGE_NAME="ghcr.io/sharknia/tuum-hotdeal-fastapi:latest"
@@ -184,7 +185,7 @@ jobs:
             fi
             docker compose -f docker-compose.prod.yml pull
             echo "Running pre-deploy migrations..."
-            docker compose -f docker-compose.prod.yml run --rm --no-deps -e RUN_DB_MIGRATIONS=1 web doppler run -- /app/entrypoint.sh true
+            docker compose -f docker-compose.prod.yml run -T --rm --no-deps -e RUN_DB_MIGRATIONS=1 web doppler run -- /app/entrypoint.sh true
             docker compose -f docker-compose.prod.yml up -d --force-recreate
             MAX_RETRIES=60
             SLEEP_SECONDS=5
