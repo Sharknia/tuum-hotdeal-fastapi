@@ -185,7 +185,7 @@ jobs:
               PREV_IMAGE_ID=\$(docker inspect --format='{{.Image}}' \${SERVICE_NAME})
             fi
             if docker inspect tuum-hotdeal-worker >/dev/null 2>&1; then
-              DEFUNCT_BEFORE=\$(docker exec tuum-hotdeal-worker sh -lc "grep -s '^State:' /proc/[0-9]*/status | grep -c 'zombie'" | tr -d ' ')
+              DEFUNCT_BEFORE=\$(docker exec tuum-hotdeal-worker sh -lc "grep -s '^State:[[:space:]]*Z' /proc/[0-9]*/status | wc -l" | tr -d ' ')
             fi
             docker compose -f docker-compose.prod.yml pull
             echo "Running pre-deploy migrations..."
@@ -226,7 +226,7 @@ jobs:
 
             docker inspect -f '{{.HostConfig.Init}}' tuum-hotdeal-worker | grep -qx 'true' || { echo "Runtime invariant failed: worker init must be true."; exit 1; }
             docker inspect -f '{{.Path}} {{join .Args " "}}' tuum-hotdeal-worker | grep -o 'doppler' | wc -l | tr -d ' ' | grep -qx '1' || { echo "Runtime invariant failed: doppler wrapping must be single."; exit 1; }
-            DEFUNCT_AFTER=\$(docker exec tuum-hotdeal-worker sh -lc "grep -s '^State:' /proc/[0-9]*/status | grep -c 'zombie'" | tr -d ' ')
+            DEFUNCT_AFTER=\$(docker exec tuum-hotdeal-worker sh -lc "grep -s '^State:[[:space:]]*Z' /proc/[0-9]*/status | wc -l" | tr -d ' ')
             [ "\${DEFUNCT_AFTER}" -le "\${DEFUNCT_BEFORE}" ] || { echo "Runtime invariant failed: defunct baseline regression (before=\${DEFUNCT_BEFORE}, after=\${DEFUNCT_AFTER})."; exit 1; }
 
             docker image prune -f

@@ -55,7 +55,7 @@ def test_deploy_fails_when_worker_invariant_breaks():
     ) in workflow_text
     assert "DEFUNCT_BEFORE=0" in workflow_text
     assert (
-        "docker exec tuum-hotdeal-worker sh -lc \"grep -s '^State:' /proc/[0-9]*/status | grep -c 'zombie'\" | tr -d ' '"
+        "docker exec tuum-hotdeal-worker sh -lc \"grep -s '^State:[[:space:]]*Z' /proc/[0-9]*/status | wc -l\" | tr -d ' '"
     ) in workflow_text
     assert (
         "[ \"\\${DEFUNCT_AFTER}\" -le \"\\${DEFUNCT_BEFORE}\" ] || { echo \"Runtime invariant failed: defunct baseline regression"
