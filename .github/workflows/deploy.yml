@@ -220,8 +220,16 @@ jobs:
               exit 1
             fi
 
+            docker inspect -f '{{.HostConfig.Init}}' tuum-hotdeal-worker | grep -qx 'true' || { echo "Runtime invariant failed: worker init must be true."; exit 1; }
+            docker inspect -f '{{.Path}} {{join .Args " "}}' tuum-hotdeal-worker | grep -o 'doppler' | wc -l | tr -d ' ' | grep -qx '1' || { echo "Runtime invariant failed: doppler wrapping must be single."; exit 1; }
+            docker exec tuum-hotdeal-worker sh -lc "ps -eo stat,args | grep -c '<defunct>'" | grep -qx '0' || { echo "Runtime invariant failed: defunct baseline must be 0."; exit 1; }
+
             docker image prune -f
           EOF
+
+      - name: Fail deploy on runtime invariant gate failure
+        if: ${{ failure() }}
+        run: exit 1
 
   tag:
     name: Create Tag

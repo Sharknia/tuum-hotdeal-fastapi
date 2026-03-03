@@ -25,6 +25,9 @@ services:
       timeout: 10s
       start_period: 120s
       retries: 3
+    init: true
+    stop_signal: SIGTERM
+    stop_grace_period: 90s
     ports:
       - "10000:8000"
     restart: unless-stopped
@@ -36,7 +39,10 @@ services:
     mem_reservation: 2g
     environment:
       - DOPPLER_TOKEN=${DOPPLER_TOKEN}
-    command: ["doppler", "run", "--", "python", "app/worker_main.py"]
+    command: ["doppler", "run", "--", "python", "-m", "app.worker_main"]
     healthcheck:
       disable: true
+    init: true
+    stop_signal: SIGTERM
+    stop_grace_period: 90s
     restart: unless-stopped

@@ -1,10 +1,13 @@
-from unittest.mock import AsyncMock, patch
+import asyncio
+import signal
+from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import app.worker_main as worker_main_module
 from app.src.domain.hotdeal.enums import SiteName
 from app.src.domain.hotdeal.models import Keyword, KeywordSite
 from app.src.domain.hotdeal.schemas import CrawledKeyword
@@ -13,6 +16,7 @@ from app.worker_main import (
     get_new_hotdeal_keywords_for_site,
     handle_keyword,
     job,
+    main,
 )
 
 # --- 테스트 데이터 ---
@@ -372,3 +376,491 @@ async def test_handle_keyword_multisite_partial_failure(
 
             # AND: 실패 로깅 확인
             mock_logger.error.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_graceful_shutdown_signal():
+    """SIGTERM/SIGINT 시 graceful shutdown 경로가 실행되어야 한다."""
+
+    class DummyScheduler:
+        def __init__(self):
+            self.shutdown_calls: list[bool] = []
+
+        def add_job(self, *_args, **_kwargs):
+            return None
+
+        def start(self):
+            return None
+
+        def shutdown(self, wait: bool = True):
+            self.shutdown_calls.append(wait)
+
+    scheduler = DummyScheduler()
+    handlers: dict[signal.Signals, callable] = {}
+    handlers_ready = asyncio.Event()
+
+    class DummyLoop:
+        def add_signal_handler(self, sig, callback, *args):
+            handlers[sig] = lambda: callback(*args)
+            if len(handlers) == 2:
+                handlers_ready.set()
+
+    mock_browser = AsyncMock()
+    mock_engine_dispose = AsyncMock()
+    mock_engine = type("DummyEngine", (), {"dispose": mock_engine_dispose})()
+
+    with (
+        patch("app.worker_main.AsyncIOScheduler", return_value=scheduler),
+        patch("app.worker_main.asyncio.get_running_loop", return_value=DummyLoop()),
+        patch("app.worker_main.SharedBrowser") as mock_shared_browser,
+        patch("app.worker_main.async_engine", new=mock_engine),
+    ):
+        mock_shared_browser.get_instance.return_value.stop = mock_browser
+
+        main_task = asyncio.create_task(main())
+        await asyncio.wait_for(handlers_ready.wait(), timeout=1)
+
+        handlers[signal.SIGTERM]()
+        await asyncio.wait_for(main_task, timeout=2)
+
+    assert scheduler.shutdown_calls == [False]
+    mock_browser.assert_awaited_once()
+    mock_engine_dispose.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_shutdown_calls_browser_stop_and_engine_dispose():
+    """종료 순서: scheduler shutdown -> in-flight 대기 -> browser stop -> engine dispose."""
+
+    order: list[str] = []
+    handlers: dict[signal.Signals, callable] = {}
+    handlers_ready = asyncio.Event()
+    job_started = asyncio.Event()
+    release_job = asyncio.Event()
+    job_finished = asyncio.Event()
+
+    async def mock_job():
+        job_started.set()
+        await release_job.wait()
+        order.append("job_finished")
+        job_finished.set()
+
+    class DummyScheduler:
+        def __init__(self):
+            self.job_func = None
+
+        def add_job(self, func, *_args, **_kwargs):
+            self.job_func = func
+
+        def start(self):
+            return None
+
+        def shutdown(self, wait: bool = True):
+            order.append("scheduler_shutdown")
+            assert wait is False
+            release_job.set()
+
+    scheduler = DummyScheduler()
+
+    class DummyLoop:
+        def add_signal_handler(self, sig, callback, *args):
+            handlers[sig] = lambda: callback(*args)
+            if len(handlers) == 2:
+                handlers_ready.set()
+
+    async def mock_browser_stop():
+        assert job_finished.is_set()
+        order.append("browser_stop")
+
+    async def mock_engine_dispose(_self):
+        order.append("engine_dispose")
+
+    mock_engine = type("DummyEngine", (), {"dispose": mock_engine_dispose})()
+
+    with (
+        patch("app.worker_main.AsyncIOScheduler", return_value=scheduler),
+        patch("app.worker_main.asyncio.get_running_loop", return_value=DummyLoop()),
+        patch("app.worker_main.job", new=mock_job),
+        patch("app.worker_main.SharedBrowser") as mock_shared_browser,
+        patch("app.worker_main.async_engine", new=mock_engine),
+    ):
+        mock_shared_browser.get_instance.return_value.stop = AsyncMock(
+            side_effect=mock_browser_stop
+        )
+
+        main_task = asyncio.create_task(main())
+        await asyncio.wait_for(handlers_ready.wait(), timeout=1)
+
+        assert scheduler.job_func is not None
+        in_flight_task = asyncio.create_task(scheduler.job_func())
+        await asyncio.wait_for(job_started.wait(), timeout=1)
+
+        handlers[signal.SIGINT]()
+        await asyncio.wait_for(main_task, timeout=2)
+        await asyncio.wait_for(in_flight_task, timeout=1)
+
+    assert order == [
+        "scheduler_shutdown",
+        "job_finished",
+        "browser_stop",
+        "engine_dispose",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_scheduler_single_instance():
+    """스케줄러 등록 옵션이 단일 실행 정책으로 고정되어야 한다."""
+
+    class DummyScheduler:
+        def __init__(self):
+            self.add_job_kwargs = None
+
+        def add_job(self, _func, *_args, **kwargs):
+            self.add_job_kwargs = kwargs
+
+        def start(self):
+            return None
+
+        def shutdown(self, wait: bool = True):
+            return None
+
+    scheduler = DummyScheduler()
+    handlers: dict[signal.Signals, callable] = {}
+    handlers_ready = asyncio.Event()
+
+    class DummyLoop:
+        def add_signal_handler(self, sig, callback, *args):
+            handlers[sig] = lambda: callback(*args)
+            if len(handlers) == 2:
+                handlers_ready.set()
+
+    mock_browser = AsyncMock()
+    mock_engine_dispose = AsyncMock()
+    mock_engine = type("DummyEngine", (), {"dispose": mock_engine_dispose})()
+
+    with (
+        patch("app.worker_main.AsyncIOScheduler", return_value=scheduler),
+        patch("app.worker_main.asyncio.get_running_loop", return_value=DummyLoop()),
+        patch("app.worker_main.SharedBrowser") as mock_shared_browser,
+        patch("app.worker_main.async_engine", new=mock_engine),
+    ):
+        mock_shared_browser.get_instance.return_value.stop = mock_browser
+
+        main_task = asyncio.create_task(main())
+        await asyncio.wait_for(handlers_ready.wait(), timeout=1)
+        handlers[signal.SIGTERM]()
+        await asyncio.wait_for(main_task, timeout=2)
+
+    assert scheduler.add_job_kwargs is not None
+    assert scheduler.add_job_kwargs["max_instances"] == 1
+    assert scheduler.add_job_kwargs["coalesce"] is True
+    assert scheduler.add_job_kwargs["misfire_grace_time"] == 300
+
+
+@pytest.mark.asyncio
+async def test_job_lock_prevents_overlap():
+    """동시 트리거 시 job 본문은 1회만 실행되어야 한다."""
+
+    run_started = asyncio.Event()
+    release_run = asyncio.Event()
+
+    async def mock_run_job_once():
+        run_started.set()
+        await release_run.wait()
+
+    with (
+        patch("app.worker_main.JOB_RUN_LOCK", new=asyncio.Lock()),
+        patch("app.worker_main._run_job_once", new=AsyncMock(side_effect=mock_run_job_once)) as mock_run,
+    ):
+        first_task = asyncio.create_task(job())
+        await asyncio.wait_for(run_started.wait(), timeout=1)
+
+        second_task = asyncio.create_task(job())
+        await asyncio.sleep(0)
+
+        release_run.set()
+        await asyncio.gather(first_task, second_task)
+
+    assert mock_run.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_job_cancelled_error_cleanup_order():
+    """취소 발생 시 상태 업데이트 후 browser stop이 호출되어야 한다."""
+
+    order: list[str] = []
+
+    created_log = worker_main_module.WorkerLog(status=worker_main_module.WorkerStatus.RUNNING)
+    created_log.id = 101
+
+    create_session = AsyncMock()
+    create_session.add = Mock()
+    create_session.commit = AsyncMock()
+
+    async def create_refresh(entry):
+        entry.id = created_log.id
+
+    create_session.refresh = AsyncMock(side_effect=create_refresh)
+
+    create_session_cm = AsyncMock()
+    create_session_cm.__aenter__.return_value = create_session
+    create_session_cm.__aexit__.return_value = None
+
+    updated_log = Mock()
+    updated_log.status = worker_main_module.WorkerStatus.RUNNING
+    updated_log.message = None
+    updated_log.details = None
+
+    update_result = Mock()
+    update_result.scalars.return_value.first.return_value = updated_log
+
+    update_session = AsyncMock()
+    update_session.execute = AsyncMock(return_value=update_result)
+
+    async def update_commit():
+        order.append("status_update")
+
+    update_session.commit = AsyncMock(side_effect=update_commit)
+
+    update_session_cm = AsyncMock()
+    update_session_cm.__aenter__.return_value = update_session
+    update_session_cm.__aexit__.return_value = None
+
+    mock_http_client = AsyncMock()
+    mock_http_client.get = AsyncMock(side_effect=asyncio.CancelledError())
+
+    mock_http_client_cm = AsyncMock()
+    mock_http_client_cm.__aenter__.return_value = mock_http_client
+    mock_http_client_cm.__aexit__.return_value = None
+
+    mock_browser_start = AsyncMock()
+
+    async def browser_stop():
+        order.append("browser_stop")
+
+    mock_browser_stop = AsyncMock(side_effect=browser_stop)
+
+    with (
+        patch("app.worker_main.AsyncSessionLocal", side_effect=[create_session_cm, update_session_cm]),
+        patch("app.worker_main.get_active_sites", return_value=[SiteName.ALGUMON]),
+        patch("app.worker_main._requires_browser", new=AsyncMock(return_value=True)),
+        patch("app.worker_main.httpx.AsyncClient", return_value=mock_http_client_cm),
+        patch("app.worker_main.SharedBrowser") as mock_shared_browser,
+    ):
+        mock_shared_browser.get_instance.return_value.start = mock_browser_start
+        mock_shared_browser.get_instance.return_value.stop = mock_browser_stop
+
+        with pytest.raises(asyncio.CancelledError):
+            await worker_main_module._run_job_once()
+
+    assert updated_log.status == worker_main_module.WorkerStatus.FAIL
+    assert updated_log.message == "Job cancelled"
+    assert order == ["status_update", "browser_stop"]
+
+
+@pytest.mark.asyncio
+async def test_job_logs_defunct_warning_when_nonzero():
+    """job 종료 시 defunct count가 0보다 크면 warning을 남겨야 한다."""
+
+    with (
+        patch("app.worker_main.JOB_RUN_LOCK", new=asyncio.Lock()),
+        patch("app.worker_main._run_job_once", new=AsyncMock()),
+        patch("app.worker_main._probe_defunct_count", return_value=3),
+        patch("app.worker_main._log_process_identity"),
+        patch("app.worker_main.logger") as mock_logger,
+    ):
+        await job()
+
+    mock_logger.warning.assert_called_once_with(
+        "[WARN] job 종료 시 defunct 프로세스 감지: %s", 3
+    )
+
+
+@pytest.mark.asyncio
+async def test_job_skips_browser_when_not_required():
+    """활성 크롤러가 브라우저를 요구하지 않으면 start/stop을 호출하지 않아야 한다."""
+
+    mock_response = Mock(status_code=200)
+    mock_response.raise_for_status = Mock()
+
+    mock_http_client = AsyncMock()
+    mock_http_client.get = AsyncMock(return_value=mock_response)
+
+    mock_http_client_cm = AsyncMock()
+    mock_http_client_cm.__aenter__.return_value = mock_http_client
+    mock_http_client_cm.__aexit__.return_value = None
+
+    mock_scalars = Mock()
+    mock_scalars.unique.return_value.all.return_value = []
+    mock_result = Mock()
+    mock_result.scalars.return_value = mock_scalars
+
+    mock_session = AsyncMock()
+    mock_session.add = Mock()
+    mock_session.execute = AsyncMock(side_effect=[mock_result, mock_result])
+    mock_session.commit = AsyncMock()
+    mock_session.refresh = AsyncMock()
+
+    mock_session_cm = AsyncMock()
+    mock_session_cm.__aenter__.return_value = mock_session
+    mock_session_cm.__aexit__.return_value = None
+
+    mock_browser_start = AsyncMock()
+    mock_browser_stop = AsyncMock()
+
+    with (
+        patch("app.worker_main.JOB_RUN_LOCK", new=asyncio.Lock()),
+        patch("app.worker_main.httpx.AsyncClient", return_value=mock_http_client_cm),
+        patch("app.worker_main.AsyncSessionLocal", return_value=mock_session_cm),
+        patch("app.worker_main.get_active_sites", return_value=[SiteName.ALGUMON]),
+        patch(
+            "app.worker_main.get_crawler",
+            return_value=Mock(requires_browser=False),
+        ),
+        patch("app.worker_main.SharedBrowser") as mock_shared_browser,
+    ):
+        mock_shared_browser.get_instance.return_value.start = mock_browser_start
+        mock_shared_browser.get_instance.return_value.stop = mock_browser_stop
+
+        await job()
+
+    assert mock_shared_browser.get_instance.return_value.start.await_count == 0
+    assert mock_shared_browser.get_instance.return_value.stop.await_count == 0
+
+
+@pytest.mark.asyncio
+async def test_job_starts_browser_when_required():
+    """활성 크롤러 중 하나라도 브라우저를 요구하면 start/stop을 1회씩 호출해야 한다."""
+
+    mock_response = Mock(status_code=200)
+    mock_response.raise_for_status = Mock()
+
+    mock_http_client = AsyncMock()
+    mock_http_client.get = AsyncMock(return_value=mock_response)
+
+    mock_http_client_cm = AsyncMock()
+    mock_http_client_cm.__aenter__.return_value = mock_http_client
+    mock_http_client_cm.__aexit__.return_value = None
+
+    mock_scalars = Mock()
+    mock_scalars.unique.return_value.all.return_value = []
+    mock_result = Mock()
+    mock_result.scalars.return_value = mock_scalars
+
+    mock_session = AsyncMock()
+    mock_session.add = Mock()
+    mock_session.execute = AsyncMock(side_effect=[mock_result, mock_result])
+    mock_session.commit = AsyncMock()
+    mock_session.refresh = AsyncMock()
+
+    mock_session_cm = AsyncMock()
+    mock_session_cm.__aenter__.return_value = mock_session
+    mock_session_cm.__aexit__.return_value = None
+
+    mock_browser_start = AsyncMock()
+    mock_browser_stop = AsyncMock()
+
+    with (
+        patch("app.worker_main.JOB_RUN_LOCK", new=asyncio.Lock()),
+        patch("app.worker_main.httpx.AsyncClient", return_value=mock_http_client_cm),
+        patch("app.worker_main.AsyncSessionLocal", return_value=mock_session_cm),
+        patch("app.worker_main.get_active_sites", return_value=[SiteName.ALGUMON]),
+        patch(
+            "app.worker_main.get_crawler",
+            return_value=Mock(requires_browser=True),
+        ),
+        patch("app.worker_main.SharedBrowser") as mock_shared_browser,
+    ):
+        mock_shared_browser.get_instance.return_value.start = mock_browser_start
+        mock_shared_browser.get_instance.return_value.stop = mock_browser_stop
+
+        await job()
+
+    assert mock_shared_browser.get_instance.return_value.start.await_count == 1
+    assert mock_shared_browser.get_instance.return_value.stop.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_process_identity_logging():
+    """worker/job 시작/종료 시 진단 payload가 구조화되어 기록되어야 한다."""
+
+    class DummyScheduler:
+        def add_job(self, *_args, **_kwargs):
+            return None
+
+        def start(self):
+            return None
+
+        def shutdown(self, wait: bool = True):
+            return None
+
+    scheduler = DummyScheduler()
+    handlers: dict[signal.Signals, callable] = {}
+    handlers_ready = asyncio.Event()
+
+    class DummyLoop:
+        def add_signal_handler(self, sig, callback, *args):
+            handlers[sig] = lambda: callback(*args)
+            if len(handlers) == 2:
+                handlers_ready.set()
+
+    def fake_collect(event: str):
+        return {
+            "event": event,
+            "pid": 123,
+            "ppid": 1,
+            "command": "python -m app.worker_main",
+            "ppid_command": "tini",
+            "cgroup": "0::/docker/demo",
+            "defunct_count": 0,
+        }
+
+    mock_engine_dispose = AsyncMock()
+    mock_engine = type("DummyEngine", (), {"dispose": mock_engine_dispose})()
+
+    with (
+        patch("app.worker_main._collect_process_identity", side_effect=fake_collect),
+        patch("app.worker_main.logger") as mock_logger,
+        patch("app.worker_main.AsyncIOScheduler", return_value=scheduler),
+        patch("app.worker_main.asyncio.get_running_loop", return_value=DummyLoop()),
+        patch("app.worker_main.SharedBrowser") as mock_shared_browser,
+        patch("app.worker_main.async_engine", new=mock_engine),
+        patch("app.worker_main.JOB_RUN_LOCK", new=asyncio.Lock()),
+        patch("app.worker_main._run_job_once", new=AsyncMock()),
+    ):
+        mock_shared_browser.get_instance.return_value.stop = AsyncMock()
+
+        main_task = asyncio.create_task(main())
+        await asyncio.wait_for(handlers_ready.wait(), timeout=1)
+        handlers[signal.SIGTERM]()
+        await asyncio.wait_for(main_task, timeout=2)
+
+        await job()
+
+    diag_calls = [
+        call
+        for call in mock_logger.info.call_args_list
+        if call.args and call.args[0] == "[DIAG] process_identity %s"
+    ]
+    payloads = [call.args[1] for call in diag_calls]
+
+    assert {payload["event"] for payload in payloads} >= {
+        "worker_start",
+        "worker_end",
+        "job_start",
+        "job_end",
+    }
+
+    for payload in payloads:
+        assert payload["pid"] == 123
+        assert payload["ppid"] == 1
+        assert payload["command"] == "python -m app.worker_main"
+        assert payload["cgroup"] == "0::/docker/demo"
+        assert payload["defunct_count"] == 0
+
+
+def test_defunct_count_probe_fallback():
+    """/proc 접근 실패 시 defunct_count probe는 -1을 반환해야 한다."""
+
+    with patch("app.worker_main.Path.iterdir", side_effect=OSError("proc unavailable")):
+        assert worker_main_module._probe_defunct_count() == -1

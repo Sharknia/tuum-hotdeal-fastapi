@@ -1,7 +1,10 @@
 import asyncio
+import os
 import random
+import signal
 import traceback
 from datetime import datetime
+from pathlib import Path
 
 import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -20,7 +23,10 @@ from app.src.domain.mail.models import MailLog
 from app.src.domain.user.models import User, user_keywords
 
 # 프로젝트의 공통 설정과 DB 세션을 가져옵니다
-from app.src.Infrastructure.crawling.crawlers import get_active_sites, get_crawler
+from app.src.Infrastructure.crawling.crawlers import (
+    get_active_sites,
+    get_crawler,
+)
 from app.src.Infrastructure.crawling.proxy_manager import ProxyManager
 from app.src.Infrastructure.crawling.shared_browser import SharedBrowser
 from app.src.Infrastructure.mail.mail_manager import (
@@ -56,6 +62,106 @@ AsyncSessionLocal = async_sessionmaker(
 
 
 PROXY_MANAGER = ProxyManager()
+JOB_RUN_LOCK = asyncio.Lock()
+
+UNKNOWN_TEXT = "unknown"
+UNKNOWN_COUNT = -1
+
+
+def _read_proc_file(path: str) -> str | None:
+    try:
+        return Path(path).read_text(encoding="utf-8")
+    except Exception:
+        return None
+
+
+def _get_process_command(pid: int) -> str:
+    content = _read_proc_file(f"/proc/{pid}/cmdline")
+    if not content:
+        return UNKNOWN_TEXT
+
+    command = content.replace("\x00", " ").strip()
+    if not command:
+        return UNKNOWN_TEXT
+    return command
+
+
+def _get_process_cgroup(pid: int) -> str:
+    content = _read_proc_file(f"/proc/{pid}/cgroup")
+    if not content:
+        return UNKNOWN_TEXT
+
+    lines = [line.strip() for line in content.splitlines() if line.strip()]
+    if not lines:
+        return UNKNOWN_TEXT
+    return " | ".join(lines)
+
+
+def _probe_defunct_count() -> int:
+    try:
+        proc_entries = list(Path("/proc").iterdir())
+    except Exception:
+        return UNKNOWN_COUNT
+
+    count = 0
+    for entry in proc_entries:
+        if not entry.is_dir() or not entry.name.isdigit():
+            continue
+
+        try:
+            status_text = (entry / "status").read_text(encoding="utf-8")
+        except Exception:
+            continue
+
+        for line in status_text.splitlines():
+            if line.startswith("State:") and "Z" in line:
+                count += 1
+                break
+
+    return count
+
+
+def _collect_process_identity(event: str) -> dict[str, int | str]:
+    try:
+        pid = os.getpid()
+    except Exception:
+        pid = UNKNOWN_COUNT
+
+    try:
+        ppid = os.getppid()
+    except Exception:
+        ppid = UNKNOWN_COUNT
+
+    command = UNKNOWN_TEXT
+    if pid != UNKNOWN_COUNT:
+        command = _get_process_command(pid)
+
+    ppid_command = UNKNOWN_TEXT
+    if ppid != UNKNOWN_COUNT:
+        ppid_command = _get_process_command(ppid)
+
+    cgroup = UNKNOWN_TEXT
+    if pid != UNKNOWN_COUNT:
+        cgroup = _get_process_cgroup(pid)
+
+    defunct_count = _probe_defunct_count()
+
+    return {
+        "event": event,
+        "pid": pid,
+        "ppid": ppid,
+        "command": command,
+        "ppid_command": ppid_command,
+        "cgroup": cgroup,
+        "defunct_count": defunct_count,
+    }
+
+
+def _log_process_identity(event: str, **extra_fields: str) -> None:
+    payload = _collect_process_identity(event)
+    if extra_fields:
+        payload.update(extra_fields)
+    logger.info("[DIAG] process_identity %s", payload)
 
 
 async def handle_keyword(
@@ -204,7 +310,21 @@ async def get_new_hotdeal_keywords(
     )
 
 
-async def job():
+async def _requires_browser() -> bool:
+    active_sites = get_active_sites()
+    if not active_sites:
+        return False
+
+    async with httpx.AsyncClient() as client:
+        for site in active_sites:
+            crawler = get_crawler(site, "", client)
+            if crawler.requires_browser:
+                return True
+
+    return False
+
+
+async def _run_job_once():
     """
     사용자와 연결된 키워드만 불러와 병렬로 처리하고, 결과를 취합하여 메일을 발송합니다.
     """
@@ -219,9 +339,16 @@ async def job():
     except Exception as e:
         logger.error(f"Failed to create worker log: {e}")
 
-    await SharedBrowser.get_instance().start()
+    active_sites = get_active_sites()
+    browser_required = await _requires_browser()
+    browser_cleanup_required = False
+
     total_items_found = 0
     try:
+        if browser_required:
+            browser_cleanup_required = True
+            await SharedBrowser.get_instance().start()
+
         # Supabase DB 활성화를 위한 주기적인 호출
         try:
             async with httpx.AsyncClient() as client:
@@ -268,7 +395,7 @@ async def job():
         id_to_crawled_keyword: dict[Keyword, list[CrawledKeyword]] = {}
 
         # 사이트별 동시 실행 개수를 1개로 제한하는 세마포어 생성
-        site_semaphores = {site: asyncio.Semaphore(1) for site in get_active_sites()}
+        site_semaphores = {site: asyncio.Semaphore(1) for site in active_sites}
         # 키워드별 동시 실행 개수를 2개로 제한하는 세마포어
         keyword_semaphore = asyncio.Semaphore(2)
 
@@ -380,6 +507,22 @@ async def job():
                         await session.commit()
             except Exception as e:
                 logger.error(f"Failed to update worker log success: {e}")
+    except asyncio.CancelledError as e:
+        logger.warning("Job cancelled")
+        if log_id:
+            try:
+                async with AsyncSessionLocal() as session:
+                    stmt = select(WorkerLog).where(WorkerLog.id == log_id)
+                    result = await session.execute(stmt)
+                    log = result.scalars().first()
+                    if log:
+                        log.status = WorkerStatus.FAIL
+                        log.message = str(e) or "Job cancelled"
+                        log.details = traceback.format_exc()
+                        await session.commit()
+            except Exception as db_e:
+                logger.error(f"Failed to update worker log cancel: {db_e}")
+        raise
     except Exception as e:
         logger.error(f"Job failed with error: {e}")
         if log_id:
@@ -397,34 +540,116 @@ async def job():
                 logger.error(f"Failed to update worker log fail: {db_e}")
         raise
     finally:
-        await SharedBrowser.get_instance().stop()
+        if browser_cleanup_required:
+            await SharedBrowser.get_instance().stop()
+
+
+async def job():
+    _log_process_identity("job_start")
+    outcome = "unknown"
+    try:
+        if JOB_RUN_LOCK.locked():
+            logger.info("[INFO] 이전 작업이 아직 실행 중이어서 이번 job 실행을 건너뜁니다.")
+            outcome = "skipped_locked"
+            return
+
+        async with JOB_RUN_LOCK:
+            try:
+                await _run_job_once()
+                outcome = "success"
+            except asyncio.CancelledError:
+                outcome = "cancelled"
+                raise
+            except Exception:
+                outcome = "error"
+                raise
+    finally:
+        _log_process_identity("job_end", outcome=outcome)
+        defunct_count = _probe_defunct_count()
+        if defunct_count > 0:
+            logger.warning("[WARN] job 종료 시 defunct 프로세스 감지: %s", defunct_count)
 
 
 async def main():
     scheduler = AsyncIOScheduler(timezone="Asia/Seoul")
+    shutdown_event = asyncio.Event()
+    in_flight_jobs: set[asyncio.Task] = set()
+    loop = asyncio.get_running_loop()
+
+    def request_shutdown(sig_name: str) -> None:
+        if shutdown_event.is_set():
+            return
+        logger.info(f"[INFO] 종료 신호 수신: {sig_name}")
+        shutdown_event.set()
+
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        try:
+            loop.add_signal_handler(sig, request_shutdown, sig.name)
+        except NotImplementedError:
+            signal.signal(sig, lambda *_args, signame=sig.name: request_shutdown(signame))
 
     trigger = CronTrigger(minute="0,30")
     if settings.ENVIRONMENT != "prod":
         trigger = CronTrigger(minute="*")
 
+    async def scheduled_job() -> None:
+        current_task = asyncio.current_task()
+        if current_task is not None:
+            in_flight_jobs.add(current_task)
+        try:
+            await job()
+        finally:
+            if current_task is not None:
+                in_flight_jobs.discard(current_task)
+
     scheduler.add_job(
-        job,
+        scheduled_job,
         trigger=trigger,
         id="hotdeal_worker",
         replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=300,
     )
     scheduler.start()
+    _log_process_identity("worker_start")
     logger.info(
         "[INFO] Worker 스케줄러 시작: 매시 정각 및 30분마다 크롤링 및 메일 발송"
     )
 
     try:
         # 스케줄러가 백그라운드에서 실행되는 동안 메인 코루틴을 유지합니다.
-        while True:
-            await asyncio.sleep(3600)
-    except (KeyboardInterrupt, SystemExit):
+        await shutdown_event.wait()
+    finally:
         logger.info("[INFO] Worker 종료 중...")
-        scheduler.shutdown()
+
+        try:
+            scheduler.shutdown(wait=False)
+        except Exception as e:
+            logger.error(f"스케줄러 종료 중 오류 발생: {e}")
+
+        if in_flight_jobs:
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(*list(in_flight_jobs), return_exceptions=True),
+                    timeout=90,
+                )
+            except TimeoutError:
+                logger.warning("진행 중 작업 종료 대기 시간(90초) 초과")
+            except Exception as e:
+                logger.error(f"진행 중 작업 대기 중 오류 발생: {e}")
+
+        try:
+            await SharedBrowser.get_instance().stop()
+        except Exception as e:
+            logger.error(f"SharedBrowser 종료 중 오류 발생: {e}")
+
+        try:
+            await async_engine.dispose()
+        except Exception as e:
+            logger.error(f"DB 엔진 종료 중 오류 발생: {e}")
+
+        _log_process_identity("worker_end")
 
 
 if __name__ == "__main__":
