@@ -17,6 +17,7 @@ from app.src.core.logger import logger
 from app.src.domain.admin.v1 import router as admin_router
 from app.src.domain.hotdeal.v1 import router as hotdeal_router
 from app.src.domain.user.v1 import router as user_router
+from app.src.Infrastructure.crawling.shared_browser import SharedBrowser
 
 # CORS 설정
 if settings.ENVIRONMENT == "local":
@@ -52,6 +53,10 @@ async def lifespan(app: FastAPI):
 
     # 애플리케이션 종료
     logger.info("애플리케이션 종료...")
+    try:
+        await SharedBrowser.get_instance().stop()
+    except Exception as e:
+        logger.error(f"SharedBrowser 종료 중 오류 발생: {e}")
 
 
 app = FastAPI(lifespan=lifespan)
