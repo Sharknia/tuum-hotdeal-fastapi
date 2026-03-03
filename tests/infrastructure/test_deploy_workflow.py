@@ -31,7 +31,7 @@ def test_worker_runtime_verification_gate():
     doppler_check_index = workflow_text.index(
         "docker inspect -f '{{.Path}} {{join .Args \" \"}}' tuum-hotdeal-worker"
     )
-    defunct_check_index = workflow_text.index("grep -c '<defunct>'")
+    defunct_check_index = workflow_text.index("grep -c 'zombie'")
 
     assert restart_index < init_check_index < doppler_check_index < defunct_check_index
 
@@ -54,7 +54,7 @@ def test_deploy_fails_when_worker_invariant_breaks():
         " | grep -qx '1' || { echo \"Runtime invariant failed: doppler wrapping must be single.\"; exit 1; }"
     ) in workflow_text
     assert (
-        "docker exec tuum-hotdeal-worker sh -lc \"ps -eo stat,args | grep -c '<defunct>'\""
+        "docker exec tuum-hotdeal-worker sh -lc \"grep -s '^State:' /proc/[0-9]*/status | grep -c 'zombie'\""
         " | grep -qx '0' || { echo \"Runtime invariant failed: defunct baseline must be 0.\"; exit 1; }"
     ) in workflow_text
 
