@@ -102,6 +102,73 @@ async def keyword_and_site_in_db(
 # --- 테스트 케이스 ---
 
 
+def test_resolve_worker_concurrency_default_recommendation():
+    """기본 권장값(site=2, keyword=4)이 유효 범위에서 그대로 적용되어야 한다."""
+
+    active_sites = [SiteName.ALGUMON]
+
+    with (
+        patch("app.worker_main.settings.WORKER_SITE_CONCURRENCY", 2),
+        patch("app.worker_main.settings.WORKER_KEYWORD_CONCURRENCY", 4),
+    ):
+        site_concurrency, keyword_concurrency = (
+            worker_main_module._resolve_worker_concurrency(active_sites)
+        )
+
+    assert site_concurrency == 2
+    assert keyword_concurrency == 4
+
+
+def test_resolve_worker_concurrency_clamps_upper_bounds():
+    """상한(site<=3, keyword<=6)이 적용되어야 한다."""
+
+    active_sites = [SiteName.ALGUMON, SiteName.ALGUMON]
+
+    with (
+        patch("app.worker_main.settings.WORKER_SITE_CONCURRENCY", 10),
+        patch("app.worker_main.settings.WORKER_KEYWORD_CONCURRENCY", 99),
+    ):
+        site_concurrency, keyword_concurrency = (
+            worker_main_module._resolve_worker_concurrency(active_sites)
+        )
+
+    assert site_concurrency == 3
+    assert keyword_concurrency == 6
+
+
+def test_resolve_worker_concurrency_clamps_keyword_by_site_balance():
+    """keyword는 active_sites * site * 2를 넘지 않아야 한다."""
+
+    active_sites = [SiteName.ALGUMON]
+
+    with (
+        patch("app.worker_main.settings.WORKER_SITE_CONCURRENCY", 2),
+        patch("app.worker_main.settings.WORKER_KEYWORD_CONCURRENCY", 6),
+    ):
+        site_concurrency, keyword_concurrency = (
+            worker_main_module._resolve_worker_concurrency(active_sites)
+        )
+
+    assert site_concurrency == 2
+    assert keyword_concurrency == 4
+    assert keyword_concurrency <= len(active_sites) * site_concurrency * 2
+
+
+def test_resolve_worker_concurrency_enforces_minimum_one():
+    """설정값이 0 이하이거나 활성 사이트가 없어도 세마포어 최소값(1)은 유지해야 한다."""
+
+    with (
+        patch("app.worker_main.settings.WORKER_SITE_CONCURRENCY", 0),
+        patch("app.worker_main.settings.WORKER_KEYWORD_CONCURRENCY", 0),
+    ):
+        site_concurrency, keyword_concurrency = (
+            worker_main_module._resolve_worker_concurrency([])
+        )
+
+    assert site_concurrency == 1
+    assert keyword_concurrency == 1
+
+
 @pytest.mark.asyncio
 async def test_get_new_hotdeal_keywords_first_crawl(
     mock_db_session: AsyncSession, keyword_in_db: Keyword
