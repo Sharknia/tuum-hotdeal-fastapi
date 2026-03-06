@@ -66,6 +66,10 @@ JOB_RUN_LOCK = asyncio.Lock()
 
 UNKNOWN_TEXT = "unknown"
 UNKNOWN_COUNT = -1
+MIN_CONCURRENCY = 1
+MAX_SITE_CONCURRENCY = 3
+MAX_KEYWORD_CONCURRENCY = 6
+KEYWORD_TO_SITE_BALANCE_FACTOR = 2
 
 
 def _read_proc_file(path: str) -> str | None:
@@ -162,6 +166,52 @@ def _log_process_identity(event: str, **extra_fields: str) -> None:
     if extra_fields:
         payload.update(extra_fields)
     logger.info("[DIAG] process_identity %s", payload)
+
+
+def _clamp_concurrency(value: int, upper_bound: int) -> int:
+    return max(MIN_CONCURRENCY, min(value, max(MIN_CONCURRENCY, upper_bound)))
+
+
+def _resolve_worker_concurrency(active_sites: list[SiteName]) -> tuple[int, int]:
+    """
+    차단 리스크를 줄이기 위해 사이트/키워드 동시성에 상한을 적용합니다.
+    - site <= 3
+    - keyword <= 6
+    - keyword <= active_sites * site * 2
+    """
+
+    configured_site_concurrency = settings.WORKER_SITE_CONCURRENCY
+    site_concurrency = _clamp_concurrency(
+        configured_site_concurrency,
+        MAX_SITE_CONCURRENCY,
+    )
+
+    configured_keyword_concurrency = settings.WORKER_KEYWORD_CONCURRENCY
+    keyword_balance_cap = (
+        len(active_sites) * site_concurrency * KEYWORD_TO_SITE_BALANCE_FACTOR
+    )
+    keyword_upper_bound = min(MAX_KEYWORD_CONCURRENCY, keyword_balance_cap)
+    keyword_concurrency = _clamp_concurrency(
+        configured_keyword_concurrency,
+        keyword_upper_bound,
+    )
+
+    if (
+        site_concurrency != configured_site_concurrency
+        or keyword_concurrency != configured_keyword_concurrency
+    ):
+        logger.info(
+            "[INFO] Worker concurrency clamped: site=%s->%s, keyword=%s->%s "
+            "(active_sites=%s, keyword_balance_cap=%s)",
+            configured_site_concurrency,
+            site_concurrency,
+            configured_keyword_concurrency,
+            keyword_concurrency,
+            len(active_sites),
+            max(MIN_CONCURRENCY, keyword_balance_cap),
+        )
+
+    return site_concurrency, keyword_concurrency
 
 
 async def handle_keyword(
@@ -340,6 +390,10 @@ async def _run_job_once():
         logger.error(f"Failed to create worker log: {e}")
 
     active_sites = get_active_sites()
+    if not active_sites:
+        logger.warning("[WARN] 활성 사이트가 없어 워커 작업을 건너뜁니다.")
+        return
+
     browser_required = await _requires_browser()
     browser_cleanup_required = False
 
@@ -394,10 +448,21 @@ async def _run_job_once():
 
         id_to_crawled_keyword: dict[Keyword, list[CrawledKeyword]] = {}
 
-        # 사이트별 동시 실행 개수를 1개로 제한하는 세마포어 생성
-        site_semaphores = {site: asyncio.Semaphore(1) for site in active_sites}
-        # 키워드별 동시 실행 개수를 2개로 제한하는 세마포어
-        keyword_semaphore = asyncio.Semaphore(2)
+        # 처리량과 차단 리스크를 함께 고려해 동시성을 설정 기반으로 계산합니다.
+        site_concurrency, keyword_concurrency = _resolve_worker_concurrency(
+            active_sites
+        )
+        site_semaphores = {
+            site: asyncio.Semaphore(site_concurrency) for site in active_sites
+        }
+        keyword_semaphore = asyncio.Semaphore(keyword_concurrency)
+
+        logger.info(
+            "[INFO] Worker concurrency applied: site=%s, keyword=%s, active_sites=%s",
+            site_concurrency,
+            keyword_concurrency,
+            len(active_sites),
+        )
 
         async with httpx.AsyncClient() as client:
             # 각 키워드를 세마포어 제어 하에 처리하는 태스크 리스트 생성

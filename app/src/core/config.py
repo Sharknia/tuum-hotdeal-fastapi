@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "local"
     DEBUG: bool = True
 
+    # 워커 동시성 설정 (권장: site=2, keyword=4)
+    WORKER_SITE_CONCURRENCY: int = 2
+    WORKER_KEYWORD_CONCURRENCY: int = 4
+
     # 메일링 관련 설정
     SMTP_SERVER: str = "smtp.kakao.com"
     SMTP_PORT: int = 465

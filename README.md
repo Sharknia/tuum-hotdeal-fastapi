@@ -70,6 +70,10 @@ REFRESH_TOKEN_SECRET_KEY=your-refresh-token-secret-key
 ENVIRONMENT=local  # local | dev | prod
 DEBUG=True
 
+# Worker 동시성 (권장: site=2, keyword=4)
+WORKER_SITE_CONCURRENCY=2
+WORKER_KEYWORD_CONCURRENCY=4  # 런타임에서 site<=3, keyword<=6, keyword<=active_sites*site*2 로 제한됨
+
 # SMTP 설정 (이메일 발송용)
 SMTP_SERVER=smtp.example.com
 SMTP_PORT=465
