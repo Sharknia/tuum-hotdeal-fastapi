@@ -28,6 +28,13 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = "hotdeal1234"
     SMTP_FROM: str = "hotdeal@tuum.day"
 
+    # 크롤링 동시성/차단 대응 설정
+    CRAWL_SITE_CONCURRENCY: int = 2
+    CRAWL_KEYWORD_CONCURRENCY: int = 4
+    CRAWL_SITE_CONCURRENCY_MAX: int = 4
+    CRAWL_KEYWORD_CONCURRENCY_MAX: int = 8
+    CRAWL_BLOCK_BACKOFF_SECONDS: float = 3.0
+
     model_config = SettingsConfigDict(
         # .env 파일 경로 명시 (기본값은 프로젝트 루트의 .env)
         env_file=".env",

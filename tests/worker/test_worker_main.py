@@ -12,6 +12,7 @@ from app.src.domain.hotdeal.enums import SiteName
 from app.src.domain.hotdeal.models import Keyword, KeywordSite
 from app.src.domain.hotdeal.schemas import CrawledKeyword
 from app.worker_main import (
+    _resolve_crawl_concurrency,
     get_new_hotdeal_keywords,
     get_new_hotdeal_keywords_for_site,
     handle_keyword,
@@ -100,6 +101,32 @@ async def keyword_and_site_in_db(
 
 
 # --- 테스트 케이스 ---
+
+
+def test_resolve_crawl_concurrency_uses_configured_defaults():
+    with (
+        patch.object(worker_main_module.settings, "CRAWL_SITE_CONCURRENCY", 2),
+        patch.object(worker_main_module.settings, "CRAWL_KEYWORD_CONCURRENCY", 4),
+        patch.object(worker_main_module.settings, "CRAWL_SITE_CONCURRENCY_MAX", 4),
+        patch.object(worker_main_module.settings, "CRAWL_KEYWORD_CONCURRENCY_MAX", 8),
+    ):
+        site_limit, keyword_limit = _resolve_crawl_concurrency([SiteName.ALGUMON])
+
+    assert site_limit == 2
+    assert keyword_limit == 4
+
+
+def test_resolve_crawl_concurrency_clamps_and_aligns_keyword_limit():
+    with (
+        patch.object(worker_main_module.settings, "CRAWL_SITE_CONCURRENCY", 10),
+        patch.object(worker_main_module.settings, "CRAWL_KEYWORD_CONCURRENCY", 1),
+        patch.object(worker_main_module.settings, "CRAWL_SITE_CONCURRENCY_MAX", 4),
+        patch.object(worker_main_module.settings, "CRAWL_KEYWORD_CONCURRENCY_MAX", 8),
+    ):
+        site_limit, keyword_limit = _resolve_crawl_concurrency([SiteName.ALGUMON])
+
+    assert site_limit == 4
+    assert keyword_limit == 4
 
 
 @pytest.mark.asyncio

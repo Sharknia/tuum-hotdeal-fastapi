@@ -118,3 +118,32 @@ class TestFetchMethodBranching:
             result = await crawler.fetch()
 
             assert result is None
+
+    @pytest.mark.asyncio
+    async def test_httpx_crawler_retries_with_proxy_on_429(self):
+        """429 응답 시 Retry-After를 반영해 대기 후 프록시 재시도해야 함"""
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.status_code = 429
+        mock_response.text = "Too Many Requests"
+        mock_response.headers = {"Retry-After": "7"}
+        mock_client.get = AsyncMock(return_value=mock_response)
+
+        crawler = MockHttpxCrawler(keyword="test", client=mock_client)
+
+        with (
+            patch.object(
+                crawler,
+                "_fetch_with_proxy",
+                new=AsyncMock(return_value="<html>proxy content</html>"),
+            ) as mock_proxy_fetch,
+            patch(
+                "app.src.Infrastructure.crawling.base_crawler.asyncio.sleep",
+                new=AsyncMock(),
+            ) as mock_sleep,
+        ):
+            result = await crawler.fetch()
+
+        mock_proxy_fetch.assert_awaited_once_with("https://httpx-site.com", 10)
+        mock_sleep.assert_awaited_once_with(7.0)
+        assert result == "<html>proxy content</html>"

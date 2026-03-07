@@ -1,7 +1,9 @@
+import asyncio
 from abc import ABC, abstractmethod
 
 import httpx
 
+from app.src.core.config import settings
 from app.src.core.logger import logger
 from app.src.domain.hotdeal.enums import SiteName
 from app.src.domain.hotdeal.schemas import CrawledKeyword
@@ -11,6 +13,7 @@ from app.src.Infrastructure.crawling.proxy_manager import ProxyManager
 
 class BaseCrawler(ABC):
     requires_browser: bool = False
+    blocked_status_codes: set[int] = {403, 429, 430}
 
     def __init__(
         self,
@@ -53,12 +56,16 @@ class BaseCrawler(ABC):
         try:
             response = await self.client.get(url, timeout=timeout)
 
-            if response.status_code in [403, 430]:
+            if response.status_code in self.blocked_status_codes:
+                backoff_seconds = self._get_backoff_seconds(response)
                 if response.status_code == 430:
                     logger.error(f"{response.status_code}: {response.text}")
                 logger.warning(
-                    f"{response.status_code}: 접근이 차단되었습니다. 프록시로 재시도합니다."
+                    "%s: 접근이 차단되었습니다. %.1f초 대기 후 프록시로 재시도합니다.",
+                    response.status_code,
+                    backoff_seconds,
                 )
+                await asyncio.sleep(backoff_seconds)
                 return await self._fetch_with_proxy(url, timeout)
 
             response.raise_for_status()
@@ -85,11 +92,16 @@ class BaseCrawler(ABC):
                 async with httpx.AsyncClient(proxy=proxy_url) as proxy_client:
                     response = await proxy_client.get(url, timeout=timeout)
 
-                    if response.status_code in [403, 430]:
+                    if response.status_code in self.blocked_status_codes:
+                        backoff_seconds = self._get_backoff_seconds(response)
                         logger.warning(
-                            f"프록시 {proxy_url}에서 {response.status_code} 발생. 실패 목록에 추가합니다."
+                            "프록시 %s에서 %s 발생. %.1f초 대기 후 실패 목록에 추가합니다.",
+                            proxy_url,
+                            response.status_code,
+                            backoff_seconds,
                         )
                         self.proxy_manager.remove_proxy(proxy_url)
+                        await asyncio.sleep(backoff_seconds)
                         continue
                     elif response.status_code == 200:
                         logger.debug(f"프록시 {proxy_url}로 요청 성공")
@@ -104,6 +116,19 @@ class BaseCrawler(ABC):
 
         logger.error(f"[{self.keyword}] 모든 프록시를 사용했지만 요청에 실패했습니다.")
         return None
+
+    def _get_backoff_seconds(self, response: httpx.Response) -> float:
+        base_backoff = max(0.5, settings.CRAWL_BLOCK_BACKOFF_SECONDS)
+        retry_after = response.headers.get("Retry-After")
+        if not retry_after:
+            return base_backoff
+
+        try:
+            retry_after_seconds = float(retry_after)
+        except ValueError:
+            return base_backoff
+
+        return max(base_backoff, retry_after_seconds)
 
     async def fetchparse(self) -> list[CrawledKeyword]:
         html = await self.fetch()
