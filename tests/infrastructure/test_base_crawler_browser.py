@@ -1,3 +1,5 @@
+from datetime import UTC, datetime, timedelta
+from email.utils import format_datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -146,4 +148,63 @@ class TestFetchMethodBranching:
 
         mock_proxy_fetch.assert_awaited_once_with("https://httpx-site.com", 10)
         mock_sleep.assert_awaited_once_with(7.0)
+        assert result == "<html>proxy content</html>"
+
+    @pytest.mark.asyncio
+    async def test_httpx_crawler_caps_retry_after_seconds(self):
+        """Retry-After 숫자값이 과도하면 최대 백오프로 제한해야 함"""
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.status_code = 429
+        mock_response.text = "Too Many Requests"
+        mock_response.headers = {"Retry-After": "600"}
+        mock_client.get = AsyncMock(return_value=mock_response)
+
+        crawler = MockHttpxCrawler(keyword="test", client=mock_client)
+
+        with (
+            patch.object(
+                crawler,
+                "_fetch_with_proxy",
+                new=AsyncMock(return_value="<html>proxy content</html>"),
+            ) as mock_proxy_fetch,
+            patch(
+                "app.src.Infrastructure.crawling.base_crawler.asyncio.sleep",
+                new=AsyncMock(),
+            ) as mock_sleep,
+        ):
+            result = await crawler.fetch()
+
+        mock_proxy_fetch.assert_awaited_once_with("https://httpx-site.com", 10)
+        mock_sleep.assert_awaited_once_with(60.0)
+        assert result == "<html>proxy content</html>"
+
+    @pytest.mark.asyncio
+    async def test_httpx_crawler_parses_retry_after_http_date(self):
+        """Retry-After HTTP-date 포맷도 파싱하여 최대 백오프로 제한해야 함"""
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.status_code = 429
+        mock_response.text = "Too Many Requests"
+        future_at = datetime.now(UTC) + timedelta(minutes=10)
+        mock_response.headers = {"Retry-After": format_datetime(future_at)}
+        mock_client.get = AsyncMock(return_value=mock_response)
+
+        crawler = MockHttpxCrawler(keyword="test", client=mock_client)
+
+        with (
+            patch.object(
+                crawler,
+                "_fetch_with_proxy",
+                new=AsyncMock(return_value="<html>proxy content</html>"),
+            ) as mock_proxy_fetch,
+            patch(
+                "app.src.Infrastructure.crawling.base_crawler.asyncio.sleep",
+                new=AsyncMock(),
+            ) as mock_sleep,
+        ):
+            result = await crawler.fetch()
+
+        mock_proxy_fetch.assert_awaited_once_with("https://httpx-site.com", 10)
+        mock_sleep.assert_awaited_once_with(60.0)
         assert result == "<html>proxy content</html>"

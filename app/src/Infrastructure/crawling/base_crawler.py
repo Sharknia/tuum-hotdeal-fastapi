@@ -1,5 +1,8 @@
 import asyncio
 from abc import ABC, abstractmethod
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
+from math import isfinite
 
 import httpx
 
@@ -119,16 +122,35 @@ class BaseCrawler(ABC):
 
     def _get_backoff_seconds(self, response: httpx.Response) -> float:
         base_backoff = max(0.5, settings.CRAWL_BLOCK_BACKOFF_SECONDS)
+        max_backoff = max(base_backoff, settings.CRAWL_BLOCK_BACKOFF_MAX_SECONDS)
         retry_after = response.headers.get("Retry-After")
         if not retry_after:
             return base_backoff
 
+        retry_after_seconds = self._parse_retry_after_seconds(retry_after)
+        if retry_after_seconds is None:
+            return base_backoff
+
+        return min(max_backoff, max(base_backoff, retry_after_seconds))
+
+    def _parse_retry_after_seconds(self, retry_after: str) -> float | None:
         try:
             retry_after_seconds = float(retry_after)
         except ValueError:
-            return base_backoff
+            try:
+                retry_at = parsedate_to_datetime(retry_after)
+            except (TypeError, ValueError, OverflowError):
+                return None
 
-        return max(base_backoff, retry_after_seconds)
+            if retry_at.tzinfo is None:
+                retry_at = retry_at.replace(tzinfo=UTC)
+
+            retry_after_seconds = (retry_at - datetime.now(UTC)).total_seconds()
+
+        if not isfinite(retry_after_seconds):
+            return None
+
+        return max(0.0, retry_after_seconds)
 
     async def fetchparse(self) -> list[CrawledKeyword]:
         html = await self.fetch()
