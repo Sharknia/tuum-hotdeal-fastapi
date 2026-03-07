@@ -44,6 +44,20 @@ class MockBrowserCrawler(BaseCrawler):
         return []
 
 
+class MockProxyAsyncClient:
+    def __init__(self, response):
+        self._response = response
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    async def get(self, url: str, timeout: int = 20):
+        return self._response
+
+
 class TestRequiresBrowserAttribute:
     """requires_browser 속성 테스트"""
 
@@ -149,7 +163,9 @@ class TestFetchMethodBranching:
         ):
             result = await crawler.fetch()
 
-        mock_proxy_fetch.assert_awaited_once_with("https://httpx-site.com", 10)
+        mock_proxy_fetch.assert_awaited_once_with(
+            "https://httpx-site.com", 10, accumulated_backoff_seconds=7.0
+        )
         mock_sleep.assert_awaited_once_with(7.0)
         assert result == "<html>proxy content</html>"
 
@@ -180,7 +196,9 @@ class TestFetchMethodBranching:
         ):
             result = await crawler.fetch()
 
-        mock_proxy_fetch.assert_awaited_once_with("https://httpx-site.com", 10)
+        mock_proxy_fetch.assert_awaited_once_with(
+            "https://httpx-site.com", 10, accumulated_backoff_seconds=60.0
+        )
         mock_sleep.assert_awaited_once_with(60.0)
         assert result == "<html>proxy content</html>"
 
@@ -212,6 +230,74 @@ class TestFetchMethodBranching:
         ):
             result = await crawler.fetch()
 
-        mock_proxy_fetch.assert_awaited_once_with("https://httpx-site.com", 10)
+        mock_proxy_fetch.assert_awaited_once_with(
+            "https://httpx-site.com", 10, accumulated_backoff_seconds=60.0
+        )
         mock_sleep.assert_awaited_once_with(60.0)
         assert result == "<html>proxy content</html>"
+
+    @pytest.mark.asyncio
+    async def test_httpx_crawler_stops_when_initial_backoff_exceeds_budget(self):
+        """초기 차단 대기만으로 누적 예산을 넘기면 프록시 재시도를 중단해야 함"""
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.status_code = 429
+        mock_response.text = "Too Many Requests"
+        mock_response.headers = {"Retry-After": "7"}
+        mock_client.get = AsyncMock(return_value=mock_response)
+
+        crawler = MockHttpxCrawler(keyword="test", client=mock_client)
+
+        with (
+            patch.object(settings, "CRAWL_BLOCK_BACKOFF_SECONDS", 3.0),
+            patch.object(settings, "CRAWL_BLOCK_BACKOFF_MAX_SECONDS", 60.0),
+            patch.object(settings, "CRAWL_BLOCK_BACKOFF_BUDGET_SECONDS", 5.0),
+            patch.object(
+                crawler,
+                "_fetch_with_proxy",
+                new=AsyncMock(return_value="<html>proxy content</html>"),
+            ) as mock_proxy_fetch,
+            patch(
+                "app.src.Infrastructure.crawling.base_crawler.asyncio.sleep",
+                new=AsyncMock(),
+            ) as mock_sleep,
+        ):
+            result = await crawler.fetch()
+
+        mock_proxy_fetch.assert_not_called()
+        mock_sleep.assert_not_awaited()
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_proxy_retry_stops_when_cumulative_backoff_exceeds_budget(self):
+        """프록시 재시도 루프에서 누적 백오프 예산 도달 시 즉시 중단해야 함"""
+        crawler = MockHttpxCrawler(keyword="test", client=MagicMock())
+        crawler.proxy_manager.get_next_proxy = MagicMock(side_effect=["proxy-1", "proxy-2"])
+        crawler.proxy_manager.remove_proxy = MagicMock()
+
+        blocked_response = MagicMock()
+        blocked_response.status_code = 429
+        blocked_response.headers = {"Retry-After": "7"}
+
+        with (
+            patch.object(settings, "CRAWL_BLOCK_BACKOFF_SECONDS", 3.0),
+            patch.object(settings, "CRAWL_BLOCK_BACKOFF_MAX_SECONDS", 60.0),
+            patch.object(settings, "CRAWL_BLOCK_BACKOFF_BUDGET_SECONDS", 10.0),
+            patch(
+                "app.src.Infrastructure.crawling.base_crawler.httpx.AsyncClient",
+                side_effect=lambda proxy: MockProxyAsyncClient(blocked_response),
+            ),
+            patch(
+                "app.src.Infrastructure.crawling.base_crawler.asyncio.sleep",
+                new=AsyncMock(),
+            ) as mock_sleep,
+        ):
+            result = await crawler._fetch_with_proxy(
+                "https://httpx-site.com",
+                10,
+                accumulated_backoff_seconds=4.0,
+            )
+
+        crawler.proxy_manager.remove_proxy.assert_called_once_with("proxy-1")
+        mock_sleep.assert_not_awaited()
+        assert result is None
