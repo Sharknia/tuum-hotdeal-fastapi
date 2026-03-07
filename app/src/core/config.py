@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     CRAWL_KEYWORD_CONCURRENCY_MAX: int = 8
     CRAWL_BLOCK_BACKOFF_SECONDS: float = 3.0
     CRAWL_BLOCK_BACKOFF_MAX_SECONDS: float = 60.0
+    CRAWL_BLOCK_BACKOFF_BUDGET_SECONDS: float = 180.0
 
     model_config = SettingsConfigDict(
         # .env 파일 경로 명시 (기본값은 프로젝트 루트의 .env)

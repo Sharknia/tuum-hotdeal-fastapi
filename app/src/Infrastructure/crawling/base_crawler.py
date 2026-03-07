@@ -61,6 +61,12 @@ class BaseCrawler(ABC):
 
             if response.status_code in self.blocked_status_codes:
                 backoff_seconds = self._get_backoff_seconds(response)
+                if self._is_backoff_budget_exceeded(
+                    0.0,
+                    backoff_seconds,
+                ):
+                    return None
+
                 if response.status_code == 430:
                     logger.error(f"{response.status_code}: {response.text}")
                 logger.warning(
@@ -69,7 +75,11 @@ class BaseCrawler(ABC):
                     backoff_seconds,
                 )
                 await asyncio.sleep(backoff_seconds)
-                return await self._fetch_with_proxy(url, timeout)
+                return await self._fetch_with_proxy(
+                    url,
+                    timeout,
+                    accumulated_backoff_seconds=backoff_seconds,
+                )
 
             response.raise_for_status()
             logger.debug(f"[{self.keyword}] 요청 성공: {url}")
@@ -84,7 +94,12 @@ class BaseCrawler(ABC):
         async with BrowserFetcher() as fetcher:
             return await fetcher.fetch(url, wait_seconds=wait_seconds)
 
-    async def _fetch_with_proxy(self, url: str, timeout: int = 20) -> str | None:
+    async def _fetch_with_proxy(
+        self,
+        url: str,
+        timeout: int = 20,
+        accumulated_backoff_seconds: float = 0.0,
+    ) -> str | None:
         for _ in range(15):
             proxy_url = self.proxy_manager.get_next_proxy()
             if not proxy_url:
@@ -104,7 +119,14 @@ class BaseCrawler(ABC):
                             backoff_seconds,
                         )
                         self.proxy_manager.remove_proxy(proxy_url)
+                        if self._is_backoff_budget_exceeded(
+                            accumulated_backoff_seconds,
+                            backoff_seconds,
+                        ):
+                            return None
+
                         await asyncio.sleep(backoff_seconds)
+                        accumulated_backoff_seconds += backoff_seconds
                         continue
                     elif response.status_code == 200:
                         logger.debug(f"프록시 {proxy_url}로 요청 성공")
@@ -132,6 +154,29 @@ class BaseCrawler(ABC):
             return base_backoff
 
         return min(max_backoff, max(base_backoff, retry_after_seconds))
+
+    def _get_backoff_budget_seconds(self) -> float:
+        base_backoff = max(0.5, settings.CRAWL_BLOCK_BACKOFF_SECONDS)
+        return max(base_backoff, settings.CRAWL_BLOCK_BACKOFF_BUDGET_SECONDS)
+
+    def _is_backoff_budget_exceeded(
+        self,
+        accumulated_backoff_seconds: float,
+        next_backoff_seconds: float,
+    ) -> bool:
+        backoff_budget_seconds = self._get_backoff_budget_seconds()
+        projected_backoff_seconds = accumulated_backoff_seconds + next_backoff_seconds
+        if projected_backoff_seconds <= backoff_budget_seconds:
+            return False
+
+        logger.warning(
+            "누적 백오프 예산 %.1f초 초과(현재 %.1f초 + 다음 %.1f초). "
+            "프록시 재시도를 종료합니다.",
+            backoff_budget_seconds,
+            accumulated_backoff_seconds,
+            next_backoff_seconds,
+        )
+        return True
 
     def _parse_retry_after_seconds(self, retry_after: str) -> float | None:
         try:
