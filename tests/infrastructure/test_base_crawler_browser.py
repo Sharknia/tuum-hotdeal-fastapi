@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.src.core.config import settings
 from app.src.domain.hotdeal.enums import SiteName
 from app.src.domain.hotdeal.schemas import CrawledKeyword
 from app.src.Infrastructure.crawling.base_crawler import BaseCrawler
@@ -134,6 +135,8 @@ class TestFetchMethodBranching:
         crawler = MockHttpxCrawler(keyword="test", client=mock_client)
 
         with (
+            patch.object(settings, "CRAWL_BLOCK_BACKOFF_SECONDS", 3.0),
+            patch.object(settings, "CRAWL_BLOCK_BACKOFF_MAX_SECONDS", 60.0),
             patch.object(
                 crawler,
                 "_fetch_with_proxy",
@@ -163,6 +166,8 @@ class TestFetchMethodBranching:
         crawler = MockHttpxCrawler(keyword="test", client=mock_client)
 
         with (
+            patch.object(settings, "CRAWL_BLOCK_BACKOFF_SECONDS", 3.0),
+            patch.object(settings, "CRAWL_BLOCK_BACKOFF_MAX_SECONDS", 60.0),
             patch.object(
                 crawler,
                 "_fetch_with_proxy",
@@ -193,6 +198,8 @@ class TestFetchMethodBranching:
         crawler = MockHttpxCrawler(keyword="test", client=mock_client)
 
         with (
+            patch.object(settings, "CRAWL_BLOCK_BACKOFF_SECONDS", 3.0),
+            patch.object(settings, "CRAWL_BLOCK_BACKOFF_MAX_SECONDS", 60.0),
             patch.object(
                 crawler,
                 "_fetch_with_proxy",

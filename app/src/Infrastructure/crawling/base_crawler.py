@@ -98,7 +98,7 @@ class BaseCrawler(ABC):
                     if response.status_code in self.blocked_status_codes:
                         backoff_seconds = self._get_backoff_seconds(response)
                         logger.warning(
-                            "프록시 %s에서 %s 발생. %.1f초 대기 후 실패 목록에 추가합니다.",
+                            "프록시 %s에서 %s 발생. 실패 목록에 추가 후 %.1f초 대기합니다.",
                             proxy_url,
                             response.status_code,
                             backoff_seconds,
