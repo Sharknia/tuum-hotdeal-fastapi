@@ -61,9 +61,8 @@ class BaseCrawler(ABC):
 
             if response.status_code in self.blocked_status_codes:
                 backoff_seconds = self._get_backoff_seconds(response)
-                accumulated_backoff_seconds = 0.0
                 if self._is_backoff_budget_exceeded(
-                    accumulated_backoff_seconds,
+                    0.0,
                     backoff_seconds,
                 ):
                     return None
@@ -76,11 +75,10 @@ class BaseCrawler(ABC):
                     backoff_seconds,
                 )
                 await asyncio.sleep(backoff_seconds)
-                accumulated_backoff_seconds += backoff_seconds
                 return await self._fetch_with_proxy(
                     url,
                     timeout,
-                    accumulated_backoff_seconds=accumulated_backoff_seconds,
+                    accumulated_backoff_seconds=backoff_seconds,
                 )
 
             response.raise_for_status()
