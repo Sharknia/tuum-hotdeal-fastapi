@@ -11,7 +11,7 @@
 - 수집 명령:
   - `gh run list --workflow "Deploy to Production" --limit 40 --json ...`
   - `gh api repos/Sharknia/tuum-hotdeal-fastapi/actions/runs/<run_id>/jobs?per_page=100`
-- 계측 시각(UTC): `2026-03-07`
+- 계측 시각(UTC): `2026-03-07` (실측 수행일)
 
 ## 3. 계측 결과
 
@@ -74,4 +74,4 @@
 - `FUR-19`: [CI/CD] 백엔드 CI/배포 경로 분리 및 Docker Build 캐시 안정화
   - URL: `https://linear.app/furychick/issue/FUR-19/cicd-백엔드-ci배포-경로-분리-및-docker-build-캐시-안정화`
   - 상태: `Backlog`
-  - 관계: `FUR-17`과 `related`, `FUR-17 blocks FUR-19`
+  - 관계: `FUR-17 blocks FUR-19`
