@@ -7,6 +7,33 @@
 - Docker DB 컨테이너 실행 중 (`tuum-hotdeal-db`)
 - Poetry 환경 설정 완료
 
+## 동시성 기준 (FUR-14)
+
+### 권장 기본값
+
+- `CRAWL_SITE_CONCURRENCY=2`
+- `CRAWL_KEYWORD_CONCURRENCY=4`
+- 상한: `CRAWL_SITE_CONCURRENCY_MAX=4`, `CRAWL_KEYWORD_CONCURRENCY_MAX=8`
+
+### 판단 기준
+
+- **차단 회피**: 사이트별 동시 요청을 2로 시작하고, 403/429/430 응답 시 `Retry-After`(없으면 기본 3초, 최대 60초 상한) 대기 후 프록시 재시도
+- **속도 개선**: 기존(`site=1`, `keyword=2`) 대비 처리 시간이 유의미하게 단축될 것
+- **안전 장치**: 환경변수 오입력 시 상한으로 자동 보정(clamp)하여 과도한 동시성 방지
+
+### 근거 (로컬 시뮬레이션)
+
+같은 작업량(키워드 12개, 사이트 1개)에서 평균 지연 조건으로 비교:
+
+| site concurrency | keyword concurrency | 처리 시간 |
+|---|---|---|
+| 1 | 2 | 25.02s |
+| 2 | 4 | 13.01s |
+| 3 | 6 | 9.01s |
+| 4 | 8 | 7.01s |
+
+`site=2`, `keyword=4`는 기존 대비 약 48% 단축(25.02s -> 13.01s)이며, 상위 조합보다 차단 리스크를 낮게 유지하기 위한 균형점으로 채택.
+
 ## 1. DB 상태 확인
 
 ```bash

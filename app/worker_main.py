@@ -68,6 +68,51 @@ UNKNOWN_TEXT = "unknown"
 UNKNOWN_COUNT = -1
 
 
+def _clamp_concurrency(name: str, requested: int, max_allowed: int) -> int:
+    safe_max = max(1, max_allowed)
+    bounded = max(1, min(requested, safe_max))
+    if bounded != requested:
+        logger.warning(
+            "[WARN] %s=%s 값이 허용 범위를 벗어나 %s로 보정되었습니다. (허용 범위: 1~%s)",
+            name,
+            requested,
+            bounded,
+            safe_max,
+        )
+    return bounded
+
+
+def _resolve_crawl_concurrency(active_sites: list[SiteName]) -> tuple[int, int]:
+    site_limit = _clamp_concurrency(
+        "CRAWL_SITE_CONCURRENCY",
+        settings.CRAWL_SITE_CONCURRENCY,
+        settings.CRAWL_SITE_CONCURRENCY_MAX,
+    )
+    keyword_limit = _clamp_concurrency(
+        "CRAWL_KEYWORD_CONCURRENCY",
+        settings.CRAWL_KEYWORD_CONCURRENCY,
+        settings.CRAWL_KEYWORD_CONCURRENCY_MAX,
+    )
+
+    # 키워드 동시성이 사이트 동시성보다 낮으면 사이트 슬롯을 충분히 활용하지 못함
+    if keyword_limit < site_limit:
+        logger.info(
+            "[INFO] CRAWL_KEYWORD_CONCURRENCY(%s)가 CRAWL_SITE_CONCURRENCY(%s)보다 낮아 %s로 상향 보정합니다.",
+            keyword_limit,
+            site_limit,
+            site_limit,
+        )
+        keyword_limit = site_limit
+
+    logger.info(
+        "[INFO] 크롤링 동시성 설정: active_sites=%s, site_limit=%s, keyword_limit=%s, site_delay_jitter=1~3s",
+        len(active_sites),
+        site_limit,
+        keyword_limit,
+    )
+    return site_limit, keyword_limit
+
+
 def _read_proc_file(path: str) -> str | None:
     try:
         return Path(path).read_text(encoding="utf-8")
@@ -394,10 +439,14 @@ async def _run_job_once():
 
         id_to_crawled_keyword: dict[Keyword, list[CrawledKeyword]] = {}
 
-        # 사이트별 동시 실행 개수를 1개로 제한하는 세마포어 생성
-        site_semaphores = {site: asyncio.Semaphore(1) for site in active_sites}
-        # 키워드별 동시 실행 개수를 2개로 제한하는 세마포어
-        keyword_semaphore = asyncio.Semaphore(2)
+        site_limit, keyword_limit = _resolve_crawl_concurrency(active_sites)
+
+        # 사이트별 동시성 제한 세마포어
+        site_semaphores = {
+            site: asyncio.Semaphore(site_limit) for site in active_sites
+        }
+        # 키워드 처리 동시성 제한 세마포어
+        keyword_semaphore = asyncio.Semaphore(keyword_limit)
 
         async with httpx.AsyncClient() as client:
             # 각 키워드를 세마포어 제어 하에 처리하는 태스크 리스트 생성
