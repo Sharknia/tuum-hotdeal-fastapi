@@ -2,6 +2,8 @@ from collections import Counter, deque
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import Enum
+from ipaddress import ip_address
+from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -152,9 +154,24 @@ class ProxyManager:
         ][:limit]
         return proxies
 
+    @staticmethod
+    def _is_public_proxy_endpoint(proxy_url: str) -> bool:
+        parsed = urlparse(proxy_url)
+        host = parsed.hostname
+        if host is None:
+            return False
+        try:
+            parsed_ip = ip_address(host)
+        except ValueError:
+            return False
+        return parsed_ip.is_global
+
     def _is_proxy_healthy(self, proxy_url: str) -> bool:
         if not settings.PROXY_HEALTHCHECK_ENABLED:
             return True
+        if not self._is_public_proxy_endpoint(proxy_url):
+            logger.warning("비공인/비정상 프록시 엔드포인트 제외: proxy=%s", proxy_url)
+            return False
 
         try:
             response = requests.get(
@@ -237,13 +254,25 @@ class ProxyManager:
     def start_batch(self) -> None:
         self._batch_failure_type_counts.clear()
 
-    def _is_soft_banned(self, state: ProxyState) -> bool:
+    def _release_expired_soft_bans(self, *, now: datetime | None = None) -> int:
+        current = now or self._now()
+        released = 0
+        for state in self._proxy_states.values():
+            if state.soft_ban_until and state.soft_ban_until <= current:
+                state.soft_ban_until = None
+                released += 1
+        return released
+
+    def _has_active_soft_ban(
+        self,
+        state: ProxyState,
+        *,
+        now: datetime | None = None,
+    ) -> bool:
         if state.soft_ban_until is None:
             return False
-        if state.soft_ban_until > self._now():
-            return True
-        state.soft_ban_until = None
-        return False
+        current = now or self._now()
+        return state.soft_ban_until > current
 
     def get_next_proxy(self) -> str | None:
         """다음 사용 가능한 프록시를 반환합니다."""
@@ -251,6 +280,7 @@ class ProxyManager:
             logger.warning("사용 가능한 프록시가 없습니다.")
             return None
 
+        self._release_expired_soft_bans()
         for _ in range(len(self.proxies)):
             proxy = self.proxies.popleft()
             state = self._ensure_proxy_state(proxy)
@@ -258,7 +288,7 @@ class ProxyManager:
                 self._proxy_set.discard(proxy)
                 logger.debug("하드 밴 프록시 제거: %s", proxy)
                 continue
-            if not self._is_soft_banned(state):
+            if not self._has_active_soft_ban(state):
                 self.proxies.append(proxy)
                 return proxy
             self.proxies.append(proxy)
@@ -380,17 +410,15 @@ class ProxyManager:
             if state.is_hard_banned:
                 hard_banned_count += 1
                 continue
-            if state.soft_ban_until and state.soft_ban_until > now:
+            if self._has_active_soft_ban(state, now=now):
                 soft_banned_count += 1
-            elif state.soft_ban_until and state.soft_ban_until <= now:
-                state.soft_ban_until = None
 
         active_proxy_count = 0
         for proxy_url in self._proxy_set:
             state = self._ensure_proxy_state(proxy_url)
             if state.is_hard_banned:
                 continue
-            if self._is_soft_banned(state):
+            if self._has_active_soft_ban(state, now=now):
                 continue
             active_proxy_count += 1
 

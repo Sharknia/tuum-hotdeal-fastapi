@@ -118,50 +118,72 @@ class BaseCrawler(ABC):
                     failure_type = ProxyManager.classify_failure(
                         status_code=response.status_code
                     )
-                    self.proxy_manager.record_proxy_failure(proxy_url, failure_type)
-                    backoff_seconds = self._get_proxy_backoff_seconds(
-                        failure_type,
-                        response=response,
+                    should_retry, accumulated_backoff_seconds = (
+                        await self._handle_proxy_failure(
+                            proxy_url=proxy_url,
+                            failure_type=failure_type,
+                            accumulated_backoff_seconds=accumulated_backoff_seconds,
+                            response=response,
+                        )
                     )
-                    logger.warning(
-                        "프록시 %s에서 status=%s (failure_type=%s). %.1f초 대기 후 재시도합니다.",
-                        proxy_url,
-                        response.status_code,
-                        failure_type.value,
-                        backoff_seconds,
-                    )
-                    if self._is_backoff_budget_exceeded(
-                        accumulated_backoff_seconds,
-                        backoff_seconds,
-                    ):
-                        return None
-
-                    await asyncio.sleep(backoff_seconds)
-                    accumulated_backoff_seconds += backoff_seconds
-                    continue
+                    if should_retry:
+                        continue
+                    return None
 
             except httpx.RequestError as e:
                 failure_type = ProxyManager.classify_failure(error=e)
-                self.proxy_manager.record_proxy_failure(proxy_url, failure_type)
-                backoff_seconds = self._get_proxy_backoff_seconds(failure_type)
-                logger.warning(
-                    "프록시 %s로 요청 실패: %s (failure_type=%s). %.1f초 대기 후 재시도합니다.",
-                    proxy_url,
-                    e,
-                    failure_type.value,
-                    backoff_seconds,
+                should_retry, accumulated_backoff_seconds = (
+                    await self._handle_proxy_failure(
+                        proxy_url=proxy_url,
+                        failure_type=failure_type,
+                        accumulated_backoff_seconds=accumulated_backoff_seconds,
+                        error=e,
+                    )
                 )
-                if self._is_backoff_budget_exceeded(
-                    accumulated_backoff_seconds,
-                    backoff_seconds,
-                ):
-                    return None
-                await asyncio.sleep(backoff_seconds)
-                accumulated_backoff_seconds += backoff_seconds
-                continue
+                if should_retry:
+                    continue
+                return None
 
         logger.error(f"[{self.keyword}] 모든 프록시를 사용했지만 요청에 실패했습니다.")
         return None
+
+    async def _handle_proxy_failure(
+        self,
+        *,
+        proxy_url: str,
+        failure_type: ProxyFailureType,
+        accumulated_backoff_seconds: float,
+        response: httpx.Response | None = None,
+        error: Exception | None = None,
+    ) -> tuple[bool, float]:
+        self.proxy_manager.record_proxy_failure(proxy_url, failure_type)
+        backoff_seconds = self._get_proxy_backoff_seconds(
+            failure_type,
+            response=response,
+        )
+        if response is not None:
+            logger.warning(
+                "프록시 %s에서 status=%s (failure_type=%s). %.1f초 대기 후 재시도합니다.",
+                proxy_url,
+                response.status_code,
+                failure_type.value,
+                backoff_seconds,
+            )
+        else:
+            logger.warning(
+                "프록시 %s로 요청 실패: %s (failure_type=%s). %.1f초 대기 후 재시도합니다.",
+                proxy_url,
+                error,
+                failure_type.value,
+                backoff_seconds,
+            )
+        if self._is_backoff_budget_exceeded(
+            accumulated_backoff_seconds,
+            backoff_seconds,
+        ):
+            return False, accumulated_backoff_seconds
+        await asyncio.sleep(backoff_seconds)
+        return True, accumulated_backoff_seconds + backoff_seconds
 
     def _get_proxy_backoff_seconds(
         self,

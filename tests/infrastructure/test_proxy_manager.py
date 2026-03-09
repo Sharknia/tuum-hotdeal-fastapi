@@ -132,3 +132,40 @@ def test_replenish_loop_triggers_until_min_available(proxy_manager):
 
     assert fetch_call_count["count"] == 2
     assert proxy_manager.get_available_proxy_count() == 3
+
+
+def test_healthcheck_rejects_non_public_proxy_endpoint(proxy_manager):
+    with (
+        patch.object(settings, "PROXY_HEALTHCHECK_ENABLED", True),
+        patch("app.src.Infrastructure.crawling.proxy_manager.requests.get") as mock_get,
+    ):
+        assert proxy_manager._is_proxy_healthy("http://127.0.0.1:8080") is False
+    mock_get.assert_not_called()
+
+
+def test_healthcheck_accepts_public_proxy_endpoint(proxy_manager):
+    fake_response = FakeResponse()
+    fake_response.status_code = 200
+    with (
+        patch.object(settings, "PROXY_HEALTHCHECK_ENABLED", True),
+        patch("app.src.Infrastructure.crawling.proxy_manager.requests.get", return_value=fake_response) as mock_get,
+    ):
+        assert proxy_manager._is_proxy_healthy("http://1.1.1.1:8080") is True
+    mock_get.assert_called_once()
+
+
+def test_get_metrics_does_not_mutate_soft_ban_state(proxy_manager):
+    proxy_url = "http://1.1.1.1:8080"
+    proxy_manager.register_proxy(proxy_url)
+    state = proxy_manager.get_proxy_state(proxy_url)
+    assert state is not None
+    state.soft_ban_until = datetime.now(UTC) - timedelta(seconds=1)
+
+    metrics = proxy_manager.get_metrics()
+
+    assert metrics["active_proxy_count"] == 1
+    assert state.soft_ban_until is not None
+
+    next_proxy = proxy_manager.get_next_proxy()
+    assert next_proxy == proxy_url
+    assert state.soft_ban_until is None
