@@ -5,15 +5,17 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.src.core.config import settings
 from app.src.core.dependencies.auth import authenticate_admin_user
 from app.src.core.dependencies.db_session import get_db
 from app.src.core.exceptions.auth_excptions import AuthErrors
-from app.src.domain.admin.repositories import get_all_worker_logs
+from app.src.domain.admin.repositories import get_all_worker_logs, get_worker_log_monitor
 from app.src.domain.admin.schemas import (
     KeywordListResponse,
     UserDetailResponse,
     UserListResponse,
     WorkerLogListResponse,
+    WorkerLogMonitorResponse,
 )
 from app.src.domain.hotdeal.repositories import delete_keyword, get_all_keywords
 from app.src.domain.user.repositories import (
@@ -123,6 +125,22 @@ async def get_logs(
 ):
     logs = await get_all_worker_logs(db, skip=skip, limit=limit)
     return {"items": logs}
+
+
+@router.get(
+    "/logs/monitor",
+    response_model=WorkerLogMonitorResponse,
+    summary="워커 로그 모니터링 조회",
+)
+async def get_logs_monitor(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[AuthenticatedUser, Depends(authenticate_admin_user)],
+    window_minutes: int = Query(
+        settings.WORKER_LOG_MONITOR_WINDOW_MINUTES,
+        ge=1,
+    ),
+):
+    return await get_worker_log_monitor(db, window_minutes=window_minutes)
 
 
 @router.post(
