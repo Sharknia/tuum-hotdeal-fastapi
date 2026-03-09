@@ -135,16 +135,18 @@ def test_build_cache_uses_gha_and_registry_sources():
     workflow_text = (PROJECT_ROOT / ".github/workflows/deploy.yml").read_text(
         encoding="utf-8"
     )
+    cache_ref_base = (
+        "type=registry,ref=${{ env.REGISTRY }}/${{ steps.image.outputs.image_name }}:buildcache-arm64"
+    )
 
+    assert "id: image" in workflow_text
+    assert 'echo "image_name=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"' in workflow_text
+    assert "IMAGE_NAME: ${{ github.repository }}" not in workflow_text
     assert "cache-from: |" in workflow_text
     assert "type=gha,scope=backend-arm64" in workflow_text
-    assert (
-        "type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-arm64"
-        in workflow_text
-    )
+    assert cache_ref_base in workflow_text
     assert "cache-to: |" in workflow_text
     assert "type=gha,scope=backend-arm64,mode=max" in workflow_text
     assert (
-        "type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-arm64,"
-        "mode=max,image-manifest=true,oci-mediatypes=true"
+        f"{cache_ref_base},mode=max,image-manifest=true,oci-mediatypes=true"
     ) in workflow_text
