@@ -3,7 +3,6 @@ import os
 import random
 import signal
 import traceback
-from datetime import datetime
 from math import isfinite
 from pathlib import Path
 
@@ -16,6 +15,7 @@ from sqlalchemy.orm import selectinload
 
 from app.src.core.config import settings
 from app.src.core.logger import logger
+from app.src.core.time import utc_now
 from app.src.domain.admin.models import WorkerLog, WorkerStatus
 from app.src.domain.hotdeal.enums import SiteName
 from app.src.domain.hotdeal.models import Keyword, KeywordSite
@@ -361,7 +361,7 @@ async def get_new_hotdeal_keywords_for_site(
             last_crawled_site.link = newest_product.link
             last_crawled_site.price = newest_product.price
             last_crawled_site.meta_data = newest_product.meta_data
-            last_crawled_site.wdate = datetime.now()
+            last_crawled_site.wdate = utc_now()
         else:
             # 첫 크롤링 정보 저장
             new_site_entry = KeywordSite(

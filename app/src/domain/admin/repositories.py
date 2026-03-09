@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.src.core.time import ensure_utc, ensure_utc_or_none, utc_now
 from app.src.domain.admin.models import WorkerLog, WorkerStatus
 
 
@@ -12,14 +13,17 @@ async def get_all_worker_logs(
     result = await db.execute(
         select(WorkerLog).order_by(WorkerLog.run_at.desc()).offset(skip).limit(limit)
     )
-    return list(result.scalars().all())
+    logs = list(result.scalars().all())
+    for log in logs:
+        log.run_at = ensure_utc(log.run_at)
+    return logs
 
 
 async def get_worker_log_monitor(
     db: AsyncSession,
     window_minutes: int,
 ) -> dict[str, int | bool | datetime | None]:
-    now = datetime.now()
+    now = utc_now()
     safe_window = max(1, window_minutes)
     window_start = now - timedelta(minutes=safe_window)
     result = await db.execute(
@@ -29,18 +33,25 @@ async def get_worker_log_monitor(
     )
     recent_logs = list(result.scalars().all())
 
+    for log in recent_logs:
+        log.run_at = ensure_utc(log.run_at)
+
     success_logs = [log for log in recent_logs if log.status == WorkerStatus.SUCCESS]
     success_with_mail_logs = [log for log in success_logs if log.emails_sent > 0]
 
     return {
-        "evaluated_at": now,
+        "evaluated_at": ensure_utc(now),
         "window_minutes": safe_window,
         "total_runs_in_window": len(recent_logs),
         "success_runs_in_window": len(success_logs),
         "success_with_mail_runs_in_window": len(success_with_mail_logs),
-        "last_success_at": success_logs[0].run_at if success_logs else None,
+        "last_success_at": (
+            ensure_utc_or_none(success_logs[0].run_at) if success_logs else None
+        ),
         "last_mail_sent_at": (
-            success_with_mail_logs[0].run_at if success_with_mail_logs else None
+            ensure_utc_or_none(success_with_mail_logs[0].run_at)
+            if success_with_mail_logs
+            else None
         ),
         "alert_no_recent_success": len(success_logs) == 0,
         "alert_zero_mail_in_window": len(success_logs) > 0

@@ -1,7 +1,8 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
+from app.src.core.time import ensure_utc_or_none
 from app.src.domain.admin.models import WorkerStatus
 from app.src.domain.hotdeal.schemas import KeywordResponse
 from app.src.domain.user.schemas import UserResponse
@@ -27,6 +28,14 @@ class WorkerLogResponse(BaseModel):
     message: str | None = None
     details: str | None = None
 
+    @field_validator("run_at", mode="after")
+    @classmethod
+    def normalize_run_at_to_utc(cls, value: datetime) -> datetime:
+        normalized = ensure_utc_or_none(value)
+        if normalized is None:
+            raise ValueError("run_at must not be None")
+        return normalized
+
 
 class KeywordListResponse(BaseModel):
     items: list[KeywordResponse]
@@ -46,3 +55,8 @@ class WorkerLogMonitorResponse(BaseModel):
     last_mail_sent_at: datetime | None = None
     alert_no_recent_success: bool
     alert_zero_mail_in_window: bool
+
+    @field_validator("evaluated_at", "last_success_at", "last_mail_sent_at", mode="after")
+    @classmethod
+    def normalize_monitor_datetime_to_utc(cls, value: datetime | None) -> datetime | None:
+        return ensure_utc_or_none(value)

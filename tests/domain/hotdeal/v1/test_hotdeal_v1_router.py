@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 from fastapi import Response
@@ -156,6 +156,9 @@ async def test_get_my_keywords_list(
     # 응답 검증
     assert response.status_code == 200
     response_data = response.json()
+    parsed_wdate = datetime.fromisoformat(response_data[0]["wdate"].replace("Z", "+00:00"))
+    assert parsed_wdate.tzinfo is not None
+    assert parsed_wdate.utcoffset() == timedelta(0)
     for item in response_data:
         if "wdate" in item:
             del item["wdate"]

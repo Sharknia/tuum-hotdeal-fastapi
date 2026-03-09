@@ -1,3 +1,4 @@
+from datetime import timedelta
 from uuid import UUID
 
 import pytest
@@ -154,6 +155,9 @@ async def test_login_user(
         assert isinstance(result, LoginResponse)
         assert result.access_token is not None
         assert result.user_id == str(added_user.id)
+        assert added_user.last_login is not None
+        assert added_user.last_login.tzinfo is not None
+        assert added_user.last_login.utcoffset() == timedelta(0)
 
 
 @pytest.mark.asyncio
