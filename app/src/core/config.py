@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     CRAWL_BLOCK_BACKOFF_SECONDS: float = 3.0
     CRAWL_BLOCK_BACKOFF_MAX_SECONDS: float = 60.0
     CRAWL_BLOCK_BACKOFF_BUDGET_SECONDS: float = 180.0
+    CRAWL_SITE_BUDGET_SECONDS: float = 120.0
+    WORKER_RUN_TIMEOUT_SECONDS: float = 1500.0
+    WORKER_LOG_MONITOR_WINDOW_MINUTES: int = 90
 
     model_config = SettingsConfigDict(
         # .env 파일 경로 명시 (기본값은 프로젝트 루트의 .env)

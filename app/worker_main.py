@@ -4,6 +4,7 @@ import random
 import signal
 import traceback
 from datetime import datetime
+from math import isfinite
 from pathlib import Path
 
 import httpx
@@ -111,6 +112,28 @@ def _resolve_crawl_concurrency(active_sites: list[SiteName]) -> tuple[int, int]:
         keyword_limit,
     )
     return site_limit, keyword_limit
+
+
+def _resolve_timeout_seconds(
+    name: str,
+    configured: float,
+    fallback_seconds: float,
+) -> float:
+    safe_fallback = max(1.0, fallback_seconds)
+    try:
+        timeout_seconds = float(configured)
+        if isfinite(timeout_seconds) and timeout_seconds > 0:
+            return timeout_seconds
+    except (TypeError, ValueError):
+        pass
+
+    logger.warning(
+        "[WARN] %s=%s 값이 유효하지 않아 %.1f초로 보정되었습니다.",
+        name,
+        configured,
+        safe_fallback,
+    )
+    return safe_fallback
 
 
 def _read_proc_file(path: str) -> str | None:
@@ -221,6 +244,11 @@ async def handle_keyword(
 
     # 활성 사이트 목록을 한 번만 조회 (일관성 보장)
     active_sites = get_active_sites()
+    site_timeout_seconds = _resolve_timeout_seconds(
+        "CRAWL_SITE_BUDGET_SECONDS",
+        settings.CRAWL_SITE_BUDGET_SECONDS,
+        120.0,
+    )
 
     async def crawl_site(site: SiteName) -> list[CrawledKeyword]:
         """특정 사이트에서 크롤링 수행 (세마포어로 동시성 제어)"""
@@ -228,9 +256,21 @@ async def handle_keyword(
             # 각 작업 사이에 랜덤한 지연을 주어 서버 부하를 분산
             await asyncio.sleep(random.uniform(1, 3))
             async with AsyncSessionLocal() as session:
-                return await get_new_hotdeal_keywords_for_site(
-                    session, keyword, client, site
-                )
+                try:
+                    return await asyncio.wait_for(
+                        get_new_hotdeal_keywords_for_site(
+                            session, keyword, client, site
+                        ),
+                        timeout=site_timeout_seconds,
+                    )
+                except TimeoutError:
+                    logger.warning(
+                        "[%s] %s 크롤링 시간 제한 %.1f초를 초과하여 건너뜁니다.",
+                        keyword.title,
+                        site.value,
+                        site_timeout_seconds,
+                    )
+                    return []
 
     # 모든 활성 사이트에서 병렬 크롤링
     site_results = await asyncio.gather(
@@ -389,6 +429,7 @@ async def _run_job_once():
     browser_cleanup_required = False
 
     total_items_found = 0
+    total_emails_sent = 0
     try:
         if browser_required:
             browser_cleanup_required = True
@@ -540,6 +581,7 @@ async def _run_job_once():
 
         if email_tasks:
             await asyncio.gather(*email_tasks)
+            total_emails_sent = len(email_tasks)
 
         # 작업이 완료되면 지역 변수인 id_to_crawled_keyword는 자동으로 사라집니다.
         logger.info("[INFO] 메일 발송 완료 및 크롤링 결과 초기화")
@@ -553,6 +595,7 @@ async def _run_job_once():
                     if log:
                         log.status = WorkerStatus.SUCCESS
                         log.items_found = total_items_found
+                        log.emails_sent = total_emails_sent
                         await session.commit()
             except Exception as e:
                 logger.error(f"Failed to update worker log success: {e}")
@@ -596,6 +639,11 @@ async def _run_job_once():
 async def job():
     _log_process_identity("job_start")
     outcome = "unknown"
+    worker_run_timeout_seconds = _resolve_timeout_seconds(
+        "WORKER_RUN_TIMEOUT_SECONDS",
+        settings.WORKER_RUN_TIMEOUT_SECONDS,
+        1500.0,
+    )
     try:
         if JOB_RUN_LOCK.locked():
             logger.info("[INFO] 이전 작업이 아직 실행 중이어서 이번 job 실행을 건너뜁니다.")
@@ -604,8 +652,18 @@ async def job():
 
         async with JOB_RUN_LOCK:
             try:
-                await _run_job_once()
+                await asyncio.wait_for(
+                    _run_job_once(),
+                    timeout=worker_run_timeout_seconds,
+                )
                 outcome = "success"
+            except TimeoutError:
+                outcome = "timeout"
+                logger.error(
+                    "워커 실행 시간 제한 %.1f초를 초과하여 현재 실행을 중단했습니다. "
+                    "다음 스케줄에서 재시도됩니다.",
+                    worker_run_timeout_seconds,
+                )
             except asyncio.CancelledError:
                 outcome = "cancelled"
                 raise
