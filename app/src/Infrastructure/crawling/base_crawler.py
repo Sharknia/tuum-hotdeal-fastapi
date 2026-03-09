@@ -11,7 +11,7 @@ from app.src.core.logger import logger
 from app.src.domain.hotdeal.enums import SiteName
 from app.src.domain.hotdeal.schemas import CrawledKeyword
 from app.src.Infrastructure.crawling.browser_fetcher import BrowserFetcher
-from app.src.Infrastructure.crawling.proxy_manager import ProxyManager
+from app.src.Infrastructure.crawling.proxy_manager import ProxyFailureType, ProxyManager
 
 
 class BaseCrawler(ABC):
@@ -110,37 +110,91 @@ class BaseCrawler(ABC):
                 async with httpx.AsyncClient(proxy=proxy_url) as proxy_client:
                     response = await proxy_client.get(url, timeout=timeout)
 
-                    if response.status_code in self.blocked_status_codes:
-                        backoff_seconds = self._get_backoff_seconds(response)
-                        logger.warning(
-                            "프록시 %s에서 %s 발생. 실패 목록에 추가 후 %.1f초 대기합니다.",
-                            proxy_url,
-                            response.status_code,
-                            backoff_seconds,
-                        )
-                        self.proxy_manager.remove_proxy(proxy_url)
-                        if self._is_backoff_budget_exceeded(
-                            accumulated_backoff_seconds,
-                            backoff_seconds,
-                        ):
-                            return None
-
-                        await asyncio.sleep(backoff_seconds)
-                        accumulated_backoff_seconds += backoff_seconds
-                        continue
-                    elif response.status_code == 200:
+                    if response.status_code == 200:
+                        self.proxy_manager.record_proxy_success(proxy_url)
                         logger.debug(f"프록시 {proxy_url}로 요청 성공")
                         return response.text
 
+                    failure_type = ProxyManager.classify_failure(
+                        status_code=response.status_code
+                    )
+                    should_retry, accumulated_backoff_seconds = (
+                        await self._handle_proxy_failure(
+                            proxy_url=proxy_url,
+                            failure_type=failure_type,
+                            accumulated_backoff_seconds=accumulated_backoff_seconds,
+                            response=response,
+                        )
+                    )
+                    if should_retry:
+                        continue
+                    return None
+
             except httpx.RequestError as e:
-                logger.warning(
-                    f"프록시 {proxy_url}로 요청 실패: {e}. 실패 목록에 추가합니다."
+                failure_type = ProxyManager.classify_failure(error=e)
+                should_retry, accumulated_backoff_seconds = (
+                    await self._handle_proxy_failure(
+                        proxy_url=proxy_url,
+                        failure_type=failure_type,
+                        accumulated_backoff_seconds=accumulated_backoff_seconds,
+                        error=e,
+                    )
                 )
-                self.proxy_manager.remove_proxy(proxy_url)
-                continue
+                if should_retry:
+                    continue
+                return None
 
         logger.error(f"[{self.keyword}] 모든 프록시를 사용했지만 요청에 실패했습니다.")
         return None
+
+    async def _handle_proxy_failure(
+        self,
+        *,
+        proxy_url: str,
+        failure_type: ProxyFailureType,
+        accumulated_backoff_seconds: float,
+        response: httpx.Response | None = None,
+        error: Exception | None = None,
+    ) -> tuple[bool, float]:
+        self.proxy_manager.record_proxy_failure(proxy_url, failure_type)
+        backoff_seconds = self._get_proxy_backoff_seconds(
+            failure_type,
+            response=response,
+        )
+        if response is not None:
+            logger.warning(
+                "프록시 %s에서 status=%s (failure_type=%s). %.1f초 대기 후 재시도합니다.",
+                proxy_url,
+                response.status_code,
+                failure_type.value,
+                backoff_seconds,
+            )
+        else:
+            logger.warning(
+                "프록시 %s로 요청 실패: %s (failure_type=%s). %.1f초 대기 후 재시도합니다.",
+                proxy_url,
+                error,
+                failure_type.value,
+                backoff_seconds,
+            )
+        if self._is_backoff_budget_exceeded(
+            accumulated_backoff_seconds,
+            backoff_seconds,
+        ):
+            return False, accumulated_backoff_seconds
+        await asyncio.sleep(backoff_seconds)
+        return True, accumulated_backoff_seconds + backoff_seconds
+
+    def _get_proxy_backoff_seconds(
+        self,
+        failure_type: ProxyFailureType,
+        response: httpx.Response | None = None,
+    ) -> float:
+        policy_backoff = self.proxy_manager.get_failure_backoff_seconds(failure_type)
+        if response is not None and failure_type == ProxyFailureType.BLOCKED:
+            retry_after_backoff = self._get_backoff_seconds(response)
+            return max(policy_backoff, retry_after_backoff)
+        return policy_backoff
 
     def _get_backoff_seconds(self, response: httpx.Response) -> float:
         base_backoff = max(0.5, settings.CRAWL_BLOCK_BACKOFF_SECONDS)

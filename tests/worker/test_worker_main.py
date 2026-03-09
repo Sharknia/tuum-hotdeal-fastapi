@@ -12,6 +12,7 @@ from app.src.domain.hotdeal.enums import SiteName
 from app.src.domain.hotdeal.models import Keyword, KeywordSite
 from app.src.domain.hotdeal.schemas import CrawledKeyword
 from app.worker_main import (
+    _apply_proxy_pool_protection,
     _resolve_crawl_concurrency,
     _resolve_timeout_seconds,
     get_new_hotdeal_keywords,
@@ -128,6 +129,30 @@ def test_resolve_crawl_concurrency_clamps_and_aligns_keyword_limit():
 
     assert site_limit == 4
     assert keyword_limit == 4
+
+
+def test_apply_proxy_pool_protection_reduces_limits_and_prioritizes_keywords():
+    keywords = [
+        Mock(title="beta", users=[1]),
+        Mock(title="alpha", users=[1, 2, 3]),
+        Mock(title="gamma", users=[1, 2]),
+        Mock(title="delta", users=[1]),
+    ]
+
+    with (
+        patch.object(worker_main_module.settings, "CRAWL_PROTECTION_SITE_CONCURRENCY", 1),
+        patch.object(worker_main_module.settings, "CRAWL_PROTECTION_KEYWORD_CONCURRENCY", 2),
+        patch.object(worker_main_module.settings, "CRAWL_PROTECTION_KEYWORD_RATIO", 0.5),
+    ):
+        selected, protected_site_limit, protected_keyword_limit = _apply_proxy_pool_protection(
+            keywords,
+            site_limit=4,
+            keyword_limit=6,
+        )
+
+    assert protected_site_limit == 1
+    assert protected_keyword_limit == 2
+    assert [keyword.title for keyword in selected] == ["alpha", "gamma"]
 
 
 @pytest.mark.parametrize(

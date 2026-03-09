@@ -40,6 +40,32 @@ class Settings(BaseSettings):
     WORKER_RUN_TIMEOUT_SECONDS: float = 1500.0
     WORKER_LOG_MONITOR_WINDOW_MINUTES: int = 90
 
+    # 프록시 밴 정책/보강 설정
+    MIN_AVAILABLE_PROXIES: int = 5
+    PROXY_REPLENISH_ATTEMPTS: int = 2
+    PROXY_FETCH_LIMIT: int = 15
+
+    PROXY_SOFT_BAN_FAILURE_THRESHOLD: int = 2
+    PROXY_SOFT_BAN_TTL_SECONDS: int = 900
+    PROXY_HARD_BAN_FAILURE_THRESHOLD: int = 5
+    PROXY_SUCCESS_DECAY: int = 1
+
+    PROXY_BACKOFF_BLOCKED_SECONDS: float = 5.0
+    PROXY_BACKOFF_NETWORK_SECONDS: float = 3.0
+    PROXY_BACKOFF_SSL_SECONDS: float = 8.0
+    PROXY_BACKOFF_SERVER_SECONDS: float = 4.0
+    PROXY_BACKOFF_UNKNOWN_SECONDS: float = 2.0
+
+    PROXY_HEALTHCHECK_ENABLED: bool = True
+    PROXY_HEALTHCHECK_URL: str = "https://httpbin.org/ip"
+    PROXY_HEALTHCHECK_TIMEOUT_SECONDS: float = 5.0
+    PROXY_SOURCE_FAILURE_THRESHOLD: int = 3
+    PROXY_SOURCE_COOLDOWN_SECONDS: int = 600
+
+    CRAWL_PROTECTION_SITE_CONCURRENCY: int = 1
+    CRAWL_PROTECTION_KEYWORD_CONCURRENCY: int = 2
+    CRAWL_PROTECTION_KEYWORD_RATIO: float = 0.5
+
     model_config = SettingsConfigDict(
         # .env 파일 경로 명시 (기본값은 프로젝트 루트의 .env)
         env_file=".env",
