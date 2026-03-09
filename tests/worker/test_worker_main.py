@@ -13,6 +13,7 @@ from app.src.domain.hotdeal.models import Keyword, KeywordSite
 from app.src.domain.hotdeal.schemas import CrawledKeyword
 from app.worker_main import (
     _resolve_crawl_concurrency,
+    _resolve_timeout_seconds,
     get_new_hotdeal_keywords,
     get_new_hotdeal_keywords_for_site,
     handle_keyword,
@@ -127,6 +128,21 @@ def test_resolve_crawl_concurrency_clamps_and_aligns_keyword_limit():
 
     assert site_limit == 4
     assert keyword_limit == 4
+
+
+@pytest.mark.parametrize(
+    ("configured", "fallback", "expected"),
+    [
+        (30.0, 10.0, 30.0),
+        ("45", 10.0, 45.0),
+        (0, 10.0, 10.0),
+        (-1, 10.0, 10.0),
+        ("invalid", 10.0, 10.0),
+    ],
+)
+def test_resolve_timeout_seconds(configured, fallback, expected):
+    resolved = _resolve_timeout_seconds("TEST_TIMEOUT", configured, fallback)
+    assert resolved == expected
 
 
 @pytest.mark.asyncio
@@ -406,6 +422,49 @@ async def test_handle_keyword_multisite_partial_failure(
 
 
 @pytest.mark.asyncio
+async def test_handle_keyword_multisite_timeout_keeps_partial_success(
+    mock_db_session: AsyncSession, keyword_in_db: Keyword
+):
+    """
+    시나리오: 일부 사이트가 시간 제한을 초과
+    - 기대: 제한 초과 사이트는 건너뛰고 성공 사이트 결과를 유지
+    """
+    site_semaphores = {SiteName.ALGUMON: asyncio.Semaphore(2)}
+    call_count = 0
+
+    async def mock_get_for_site_side_effect(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return CRAWLED_DATA_NEW[:1]
+
+        await asyncio.sleep(0.05)
+        return CRAWLED_DATA_NEW[:1]
+
+    with (
+        patch(
+            "app.worker_main.get_active_sites",
+            return_value=[SiteName.ALGUMON, SiteName.ALGUMON],
+        ),
+        patch.object(worker_main_module.settings, "CRAWL_SITE_BUDGET_SECONDS", 0.01),
+        patch(
+            "app.worker_main.get_new_hotdeal_keywords_for_site", new_callable=AsyncMock
+        ) as mock_get_for_site,
+        patch("app.worker_main.AsyncSessionLocal", return_value=mock_db_session),
+        patch("app.worker_main.logger") as mock_logger,
+    ):
+        mock_get_for_site.side_effect = mock_get_for_site_side_effect
+
+        async with httpx.AsyncClient() as client:
+            result = await handle_keyword(keyword_in_db, client, site_semaphores)
+
+    assert result is not None
+    _, deals = result
+    assert len(deals) == 1
+    mock_logger.warning.assert_called()
+
+
+@pytest.mark.asyncio
 async def test_graceful_shutdown_signal():
     """SIGTERM/SIGINT 시 graceful shutdown 경로가 실행되어야 한다."""
 
@@ -609,6 +668,32 @@ async def test_job_lock_prevents_overlap():
         await asyncio.gather(first_task, second_task)
 
     assert mock_run.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_job_timeout_releases_lock_and_allows_next_run():
+    """timeout 이후에도 락이 해제되어 다음 실행이 정상 시작되어야 한다."""
+
+    call_count = 0
+
+    async def mock_run_job_once():
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            await asyncio.sleep(0.05)
+
+    with (
+        patch("app.worker_main.JOB_RUN_LOCK", new=asyncio.Lock()),
+        patch.object(worker_main_module.settings, "WORKER_RUN_TIMEOUT_SECONDS", 0.01),
+        patch(
+            "app.worker_main._run_job_once",
+            new=AsyncMock(side_effect=mock_run_job_once),
+        ) as mock_run,
+    ):
+        await job()
+        await job()
+
+    assert mock_run.await_count == 2
 
 
 @pytest.mark.asyncio
