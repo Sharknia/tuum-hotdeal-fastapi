@@ -273,14 +273,22 @@ class TestFetchMethodBranching:
     async def test_proxy_retry_stops_when_cumulative_backoff_exceeds_budget(self):
         """프록시 재시도 루프에서 누적 백오프 예산 도달 시 즉시 중단해야 함"""
         crawler = MockHttpxCrawler(keyword="test", client=MagicMock())
-        crawler.proxy_manager.get_next_proxy = MagicMock(side_effect=["proxy-1", "proxy-2"])
-        crawler.proxy_manager.remove_proxy = MagicMock()
 
         blocked_response = MagicMock()
         blocked_response.status_code = 429
         blocked_response.headers = {"Retry-After": "7"}
 
         with (
+            patch.object(
+                crawler.proxy_manager,
+                "get_next_proxy",
+                new=MagicMock(side_effect=["proxy-1", "proxy-2"]),
+            ),
+            patch.object(
+                crawler.proxy_manager,
+                "record_proxy_failure",
+                new=MagicMock(),
+            ) as mock_record_proxy_failure,
             patch.object(settings, "CRAWL_BLOCK_BACKOFF_SECONDS", 3.0),
             patch.object(settings, "CRAWL_BLOCK_BACKOFF_MAX_SECONDS", 60.0),
             patch.object(settings, "CRAWL_BLOCK_BACKOFF_BUDGET_SECONDS", 10.0),
@@ -299,7 +307,7 @@ class TestFetchMethodBranching:
                 accumulated_backoff_seconds=4.0,
             )
 
-        crawler.proxy_manager.remove_proxy.assert_called_once_with("proxy-1")
+        mock_record_proxy_failure.assert_called_once()
         mock_sleep.assert_not_awaited()
         assert result is None
 
