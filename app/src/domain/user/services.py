@@ -1,4 +1,3 @@
-from datetime import datetime
 from uuid import UUID
 
 from fastapi import Request, Response
@@ -13,6 +12,7 @@ from app.src.core.dependencies.auth import (
 from app.src.core.exceptions.auth_excptions import AuthErrors
 from app.src.core.logger import logger
 from app.src.core.security import hash_password, verify_password
+from app.src.core.time import utc_now
 from app.src.domain.user.enums import AuthLevel
 from app.src.domain.user.repositories import (
     create_user,
@@ -88,7 +88,7 @@ async def login_user(
     )
 
     # 마지막 로그인 시간 업데이트
-    user.last_login = datetime.now()
+    user.last_login = utc_now()
     db.add(user)
     await db.commit()
 

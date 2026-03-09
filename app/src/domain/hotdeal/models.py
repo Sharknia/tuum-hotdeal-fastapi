@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from sqlalchemy import (
     Column,
     DateTime,
@@ -13,6 +11,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app.src.core.database import Base
+from app.src.core.time import utc_now
 from app.src.domain.hotdeal.enums import SiteName
 
 
@@ -22,7 +21,7 @@ class Keyword(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     title = Column(String, nullable=False)
-    wdate = Column(DateTime, default=lambda: datetime.now(), nullable=False)
+    wdate = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     users = relationship("User", secondary="user_keywords", back_populates="keywords")
     mail_logs = relationship("MailLog", back_populates="keyword")
@@ -42,6 +41,6 @@ class KeywordSite(Base):
     link = Column(String, nullable=True)
     price = Column(String, nullable=True)
     meta_data = Column(Text, nullable=True)
-    wdate = Column(DateTime, default=lambda: datetime.now(), nullable=False)
+    wdate = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     keyword = relationship("Keyword", back_populates="sites")

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -8,6 +8,12 @@ from app.src.domain.admin.models import WorkerLog, WorkerStatus
 from app.src.domain.hotdeal.models import Keyword
 from app.src.domain.user.enums import AuthLevel
 from app.src.domain.user.schemas import AuthenticatedUser
+
+
+def _assert_utc_datetime_string(value: str) -> None:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    assert parsed.tzinfo is not None
+    assert parsed.utcoffset() == timedelta(0)
 
 
 @pytest.fixture
@@ -73,6 +79,7 @@ async def test_get_worker_logs(mock_client, mock_admin, mock_db_session):
     assert "items" in data
     assert isinstance(data["items"], list)
     assert len(data["items"]) >= 1
+    _assert_utc_datetime_string(data["items"][0]["run_at"])
 
 
 @pytest.mark.asyncio
@@ -84,7 +91,7 @@ async def test_get_worker_logs_monitor_alerts_no_recent_success(
         status=WorkerStatus.FAIL,
         items_found=0,
         emails_sent=0,
-        run_at=datetime.now() - timedelta(minutes=5),
+        run_at=datetime.now(UTC) - timedelta(minutes=5),
     )
     mock_db_session.add(fail_log)
     await mock_db_session.commit()
@@ -100,6 +107,7 @@ async def test_get_worker_logs_monitor_alerts_no_recent_success(
     assert data["alert_no_recent_success"] is True
     assert data["alert_zero_mail_in_window"] is False
     assert data["success_runs_in_window"] == 0
+    _assert_utc_datetime_string(data["evaluated_at"])
 
 
 @pytest.mark.asyncio
@@ -111,7 +119,7 @@ async def test_get_worker_logs_monitor_alerts_zero_mail_in_window(
         status=WorkerStatus.SUCCESS,
         items_found=3,
         emails_sent=0,
-        run_at=datetime.now() - timedelta(minutes=3),
+        run_at=datetime.now(UTC) - timedelta(minutes=3),
     )
     mock_db_session.add(success_log)
     await mock_db_session.commit()
@@ -126,6 +134,8 @@ async def test_get_worker_logs_monitor_alerts_zero_mail_in_window(
     data = response.json()
     assert data["alert_no_recent_success"] is False
     assert data["alert_zero_mail_in_window"] is True
+    _assert_utc_datetime_string(data["evaluated_at"])
+    _assert_utc_datetime_string(data["last_success_at"])
 
 
 @pytest.mark.asyncio
@@ -137,7 +147,7 @@ async def test_get_worker_logs_monitor_passes_when_mail_sent(
         status=WorkerStatus.SUCCESS,
         items_found=2,
         emails_sent=1,
-        run_at=datetime.now() - timedelta(minutes=2),
+        run_at=datetime.now(UTC) - timedelta(minutes=2),
     )
     mock_db_session.add(success_mail_log)
     await mock_db_session.commit()
@@ -152,3 +162,6 @@ async def test_get_worker_logs_monitor_passes_when_mail_sent(
     data = response.json()
     assert data["alert_no_recent_success"] is False
     assert data["alert_zero_mail_in_window"] is False
+    _assert_utc_datetime_string(data["evaluated_at"])
+    _assert_utc_datetime_string(data["last_success_at"])
+    _assert_utc_datetime_string(data["last_mail_sent_at"])

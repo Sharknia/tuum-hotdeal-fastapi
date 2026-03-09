@@ -1,3 +1,4 @@
+from datetime import timedelta
 from uuid import UUID
 
 import pytest
@@ -81,6 +82,8 @@ async def test_register_keyword(
         )
         assert isinstance(result, KeywordResponse)
         assert result.title == normalize_keyword(title)
+        assert result.wdate.tzinfo is not None
+        assert result.wdate.utcoffset() == timedelta(0)
 
 
 @pytest.mark.asyncio

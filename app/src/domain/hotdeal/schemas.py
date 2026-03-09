@@ -1,7 +1,8 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
+from app.src.core.time import ensure_utc
 from app.src.domain.hotdeal.enums import SiteName
 
 
@@ -25,6 +26,11 @@ class KeywordResponse(BaseModel):
     wdate: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("wdate", mode="after")
+    @classmethod
+    def normalize_wdate_to_utc(cls, value: datetime) -> datetime:
+        return ensure_utc(value)
 
 
 class SiteInfo(BaseModel):
