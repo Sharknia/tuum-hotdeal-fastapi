@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime, timedelta
 from email.utils import format_datetime
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -301,3 +302,20 @@ class TestFetchMethodBranching:
         crawler.proxy_manager.remove_proxy.assert_called_once_with("proxy-1")
         mock_sleep.assert_not_awaited()
         assert result is None
+
+    @pytest.mark.asyncio
+    async def test_fetchparse_stops_when_site_budget_exceeded(self):
+        """사이트 단위 실행 시간이 상한을 넘기면 빈 결과로 안전 종료해야 함"""
+        crawler = MockHttpxCrawler(keyword="test", client=MagicMock())
+
+        async def slow_fetch():
+            await asyncio.sleep(0.05)
+            return "<html>late content</html>"
+
+        with (
+            patch.object(settings, "CRAWL_SITE_BUDGET_SECONDS", 0.01),
+            patch.object(crawler, "fetch", new=AsyncMock(side_effect=slow_fetch)),
+        ):
+            result = await crawler.fetchparse()
+
+        assert result == []

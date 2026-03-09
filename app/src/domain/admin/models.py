@@ -11,6 +11,7 @@ class WorkerStatus(enum.Enum):
     FAIL = "FAIL"
     RUNNING = "RUNNING"
 
+
 class WorkerLog(Base):
     __tablename__ = "worker_logs"
 
@@ -18,5 +19,6 @@ class WorkerLog(Base):
     run_at = Column(DateTime, default=datetime.now, nullable=False)
     status = Column(Enum(WorkerStatus), nullable=False)
     items_found = Column(Integer, default=0)
+    emails_sent = Column(Integer, default=0)
     message = Column(Text, nullable=True)
     details = Column(Text, nullable=True)

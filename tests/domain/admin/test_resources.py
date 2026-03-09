@@ -72,3 +72,69 @@ async def test_get_worker_logs(mock_client, mock_admin, mock_db_session):
     assert "items" in data
     assert isinstance(data["items"], list)
     assert len(data["items"]) >= 1
+
+
+@pytest.mark.asyncio
+async def test_get_worker_log_monitor_alerts_when_no_recent_success(
+    mock_client, mock_admin, mock_db_session
+):
+    # Setup
+    log = WorkerLog(status=WorkerStatus.FAIL, items_found=0, emails_sent=0)
+    mock_db_session.add(log)
+    await mock_db_session.commit()
+
+    mock_client.app.dependency_overrides[authenticate_admin_user] = lambda: mock_admin
+
+    # Act
+    response = mock_client.get("/api/admin/logs/monitor?window_minutes=60")
+
+    # Assert
+    assert response.status_code == 200
+    data = response.json()
+    assert data["alert_no_recent_success"] is True
+    assert data["alert_zero_mail_in_window"] is False
+
+
+@pytest.mark.asyncio
+async def test_get_worker_log_monitor_alerts_when_success_but_no_mail(
+    mock_client, mock_admin, mock_db_session
+):
+    # Setup
+    log = WorkerLog(status=WorkerStatus.SUCCESS, items_found=3, emails_sent=0)
+    mock_db_session.add(log)
+    await mock_db_session.commit()
+
+    mock_client.app.dependency_overrides[authenticate_admin_user] = lambda: mock_admin
+
+    # Act
+    response = mock_client.get("/api/admin/logs/monitor?window_minutes=60")
+
+    # Assert
+    assert response.status_code == 200
+    data = response.json()
+    assert data["window_minutes"] == 60
+    assert data["alert_no_recent_success"] is False
+    assert data["alert_zero_mail_in_window"] is True
+
+
+@pytest.mark.asyncio
+async def test_get_worker_log_monitor_passes_when_success_with_mail(
+    mock_client, mock_admin, mock_db_session
+):
+    # Setup
+    log = WorkerLog(status=WorkerStatus.SUCCESS, items_found=5, emails_sent=2)
+    mock_db_session.add(log)
+    await mock_db_session.commit()
+
+    mock_client.app.dependency_overrides[authenticate_admin_user] = lambda: mock_admin
+
+    # Act
+    response = mock_client.get("/api/admin/logs/monitor?window_minutes=60")
+
+    # Assert
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success_runs_in_window"] >= 1
+    assert data["success_with_mail_runs_in_window"] >= 1
+    assert data["alert_no_recent_success"] is False
+    assert data["alert_zero_mail_in_window"] is False

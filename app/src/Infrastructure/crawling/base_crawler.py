@@ -159,6 +159,9 @@ class BaseCrawler(ABC):
         base_backoff = max(0.5, settings.CRAWL_BLOCK_BACKOFF_SECONDS)
         return max(base_backoff, settings.CRAWL_BLOCK_BACKOFF_BUDGET_SECONDS)
 
+    def _get_site_budget_seconds(self) -> float:
+        return max(1.0, settings.CRAWL_SITE_BUDGET_SECONDS)
+
     def _is_backoff_budget_exceeded(
         self,
         accumulated_backoff_seconds: float,
@@ -198,7 +201,17 @@ class BaseCrawler(ABC):
         return max(0.0, retry_after_seconds)
 
     async def fetchparse(self) -> list[CrawledKeyword]:
-        html = await self.fetch()
+        site_budget_seconds = self._get_site_budget_seconds()
+        try:
+            html = await asyncio.wait_for(self.fetch(), timeout=site_budget_seconds)
+        except TimeoutError:
+            logger.warning(
+                "[%s] 사이트 크롤링 시간 상한 %.1f초 초과: %s",
+                self.keyword,
+                site_budget_seconds,
+                self.url,
+            )
+            return []
         if html:
             self.results = self.parse(html)
         else:
