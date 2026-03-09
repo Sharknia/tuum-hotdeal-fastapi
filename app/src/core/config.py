@@ -43,8 +43,6 @@ class Settings(BaseSettings):
     # 프록시 밴 정책/보강 설정
     MIN_AVAILABLE_PROXIES: int = 5
     PROXY_REPLENISH_ATTEMPTS: int = 2
-    PROXY_FETCH_LIMIT: int = 15
-
     PROXY_SOFT_BAN_FAILURE_THRESHOLD: int = 2
     PROXY_SOFT_BAN_TTL_SECONDS: int = 900
     PROXY_HARD_BAN_FAILURE_THRESHOLD: int = 5
