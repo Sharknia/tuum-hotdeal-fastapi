@@ -20,6 +20,22 @@ HTML_WITH_SINGLE_PROXY = b"""
 """
 
 
+def build_proxy_table(rows: list[tuple[str, int, str, str]]) -> bytes:
+    html_rows = []
+    for host, port, anonymity, https in rows:
+        html_rows.append(
+            "<tr>"
+            f"<td>{host}</td><td>{port}</td><td></td><td></td>"
+            f"<td>{anonymity}</td><td></td><td>{https}</td>"
+            "</tr>"
+        )
+    return (
+        "<table class='table table-striped table-bordered'><tbody>"
+        + "".join(html_rows)
+        + "</tbody></table>"
+    ).encode()
+
+
 class FakeResponse:
     content = HTML_WITH_SINGLE_PROXY
 
@@ -109,6 +125,60 @@ def test_failed_proxy_not_reintroduced_across_batches(proxy_manager):
 
     assert proxy_url not in list(proxy_manager.proxies)
     assert proxy_manager.get_next_proxy() is None
+
+
+def test_extract_proxies_from_html_collects_full_table_without_limit(proxy_manager):
+    html = build_proxy_table(
+        [
+            (f"8.8.8.{index}", 8000 + index, "anonymous" if index % 2 else "transparent", "yes")
+            for index in range(1, 41)
+        ]
+    )
+
+    proxies = proxy_manager._extract_proxies_from_html(html)
+
+    assert len(proxies) == 40
+    assert proxies[0] == "http://8.8.8.1:8001"
+    assert proxies[-1] == "http://8.8.8.40:8040"
+
+
+def test_fetch_proxies_logs_candidate_pool_breakdown(proxy_manager):
+    html = build_proxy_table(
+        [
+            ("10.0.0.1", 8080, "anonymous", "yes"),
+            ("10.0.0.2", 8081, "transparent", "no"),
+        ]
+    )
+
+    class FakeTableResponse:
+        content = html
+
+        def raise_for_status(self):
+            return None
+
+    proxy_manager.register_proxy("http://10.0.0.1:8080")
+
+    with (
+        patch.object(settings, "PROXY_HEALTHCHECK_ENABLED", False),
+        patch(
+            "app.src.Infrastructure.crawling.proxy_manager.requests.get",
+            return_value=FakeTableResponse(),
+        ),
+        patch("app.src.Infrastructure.crawling.proxy_manager.logger.info") as mock_logger_info,
+    ):
+        proxy_manager.fetch_proxies()
+
+    summary_calls = [
+        call
+        for call in mock_logger_info.call_args_list
+        if call.args and call.args[0].startswith("프록시 수집 결과:")
+    ]
+    assert summary_calls
+    summary_message = summary_calls[-1].args[0]
+    assert "skipped_existing=%s" in summary_message
+    assert "pool_size_before=%s" in summary_message
+    assert "pool_size_after=%s" in summary_message
+    assert "active=%s" in summary_message
 
 
 def test_replenish_loop_triggers_until_min_available(proxy_manager):

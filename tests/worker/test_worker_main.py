@@ -279,6 +279,7 @@ async def test_job_e2e(mock_db_session, keyword_in_db):
         patch("app.worker_main.AsyncSessionLocal", return_value=mock_db_session),
         patch("app.worker_main.settings.ENVIRONMENT", "prod"),
         patch("app.worker_main.SharedBrowser") as mock_shared,
+        patch.object(worker_main_module.PROXY_MANAGER, "ensure_min_available_proxies", return_value=True),
     ):
         mock_shared.get_instance.return_value.start = AsyncMock()
         mock_shared.get_instance.return_value.stop = AsyncMock()

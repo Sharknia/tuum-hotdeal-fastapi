@@ -144,14 +144,44 @@ class ProxyManager:
             return []
 
         rows = tbody.find_all("tr")
-        limit = max(1, settings.PROXY_FETCH_LIMIT)
-        proxies = [
-            f"http://{cells[0].text.strip()}:{cells[1].text.strip()}"
-            for row in rows
-            if len(cells := row.find_all("td")) >= 7
-            and cells[6].text.strip().lower() == "yes"
-            and cells[4].text.strip().lower() == "anonymous"
-        ][:limit]
+        proxies: list[str] = []
+        seen: set[str] = set()
+        skipped_invalid_rows = 0
+
+        for row in rows:
+            cells = row.find_all("td")
+            if len(cells) < 2:
+                skipped_invalid_rows += 1
+                continue
+
+            host = cells[0].text.strip()
+            port_text = cells[1].text.strip()
+            if not host or not port_text:
+                skipped_invalid_rows += 1
+                continue
+
+            try:
+                ip_address(host)
+                port = int(port_text)
+            except ValueError:
+                skipped_invalid_rows += 1
+                continue
+
+            if port < 1 or port > 65535:
+                skipped_invalid_rows += 1
+                continue
+
+            proxy_url = f"http://{host}:{port}"
+            if proxy_url in seen:
+                continue
+            seen.add(proxy_url)
+            proxies.append(proxy_url)
+
+        if skipped_invalid_rows > 0:
+            logger.debug(
+                "프록시 테이블 파싱 중 유효하지 않은 행 제외: skipped_invalid_rows=%s",
+                skipped_invalid_rows,
+            )
         return proxies
 
     @staticmethod
@@ -203,8 +233,10 @@ class ProxyManager:
                 self._mark_source_failure("empty_candidates")
                 return list(self.proxies)
 
+            pool_size_before = len(self._proxy_set)
             added = 0
             unhealthy = 0
+            skipped_existing = 0
             skipped_hard_banned = 0
             for proxy_url in candidates:
                 state = self._ensure_proxy_state(proxy_url)
@@ -212,6 +244,7 @@ class ProxyManager:
                     skipped_hard_banned += 1
                     continue
                 if proxy_url in self._proxy_set:
+                    skipped_existing += 1
                     continue
                 if not self._is_proxy_healthy(proxy_url):
                     unhealthy += 1
@@ -225,13 +258,21 @@ class ProxyManager:
             else:
                 self._mark_source_failure("no_healthy_proxy_added")
 
+            metrics = self.get_metrics()
             logger.info(
-                "프록시 수집 결과: candidates=%s, added=%s, unhealthy=%s, skipped_hard_banned=%s, pool_size=%s",
+                "프록시 수집 결과: candidates=%s, added=%s, unhealthy=%s, "
+                "skipped_existing=%s, skipped_hard_banned=%s, pool_size_before=%s, "
+                "pool_size_after=%s, active=%s, soft_banned=%s, hard_banned=%s",
                 len(candidates),
                 added,
                 unhealthy,
+                skipped_existing,
                 skipped_hard_banned,
+                pool_size_before,
                 len(self._proxy_set),
+                metrics["active_proxy_count"],
+                metrics["soft_banned_count"],
+                metrics["hard_banned_count"],
             )
 
         except Exception as e:
