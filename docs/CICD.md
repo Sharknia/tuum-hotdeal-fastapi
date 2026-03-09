@@ -10,13 +10,18 @@
 - **Frontend**: Cloudflare Pages를 통해 글로벌 CDN 환경으로 배포됩니다.
 
 ### 변경 경로 기반 조건부 배포
-본 저장소는 변경 경로를 기준으로 배포 여부를 결정합니다. 백엔드 또는 프론트엔드 변경에 해당하는 경우에만 배포가 실행되며, 그 외 변경은 전부 **Non Deploy**입니다.
+본 저장소는 변경 경로를 기준으로 CI/배포 여부를 결정합니다. `backend_ci`와 `backend_deploy`를 분리해 테스트/설정 변경에서는 배포를 생략하고, 런타임 영향 변경에서만 전체 배포 경로를 실행합니다.
 
-- **우선순위**: `Frontend 변경` → `Backend 변경` → `Non Deploy`
+- **우선순위**: `Frontend 변경` → `Backend Deploy 변경` → `Backend CI 전용 변경` → `Non Deploy`
 - **Frontend 변경**: `static/**`
-- **Backend 변경**: `app/**`, `alembic/**`, `tests/**`, `pyproject.toml`, `poetry.lock`, `Dockerfile`, `docker-compose*.yml`, `entrypoint.sh`, `Makefile`, `alembic.ini`, `pyrightconfig.json`, `pytest.ini`
+- **Backend CI 변경 (`backend_ci`)**: `app/**`, `alembic/**`, `tests/**`, `.env.test`, `pyproject.toml`, `poetry.lock`, `Dockerfile`, `docker-compose*.yml`, `entrypoint.sh`, `Makefile`, `alembic.ini`, `pyrightconfig.json`, `pytest.ini`
+- **Backend Deploy 변경 (`backend_deploy`)**: `app/**`, `alembic/**`, `pyproject.toml`, `poetry.lock`, `Dockerfile`, `docker-compose*.yml`, `entrypoint.sh`, `alembic.ini`
 - **Non Deploy**: 위 경로에 해당하지 않는 모든 변경(예: `.agent/**`, `.opencode/**`, `docs/**`, `README.md`, `.gitignore`, `.github/**`)
-- **태깅**: 배포가 수행된 경우에만 태깅됩니다.
+- **잡 분기**:
+  - `Lint/Test`: `backend_ci` 기준
+  - `Build/Deploy/Create Tag`: `backend_deploy` 기준
+  - `tests/**`, `.env.test`, `pytest.ini` 전용 변경: `Lint/Test`만 실행되고 배포는 생략
+- **태깅**: `Deploy` 또는 `Deploy Frontend`가 성공한 경우에만 태깅됩니다.
 
 ### 배포 분리 이유 (Why Split?)
 1. **성능 및 CDN 활용**: 프론트엔드 정적 파일을 Cloudflare의 글로벌 CDN을 통해 서빙함으로써 전 세계 사용자에게 빠른 응답 속도를 제공합니다.
@@ -32,6 +37,8 @@
 2. **Test**: `Pytest`를 통해 유닛 테스트 및 통합 테스트를 실행합니다.
 3. **Build**: Docker 이미지를 빌드하고 GitHub Container Registry (GHCR)에 푸시합니다.
     - 빌드 타겟 플랫폼: **`linux/arm64`**
+    - Build cache: `type=gha` + `type=registry(buildcache-arm64)` 병행
+    - 캐시 복구 순서: `gha` → `registry` (GHA 캐시 미스 시 registry 캐시 폴백)
 4. **Deploy**: 운영 서버에 SSH로 접속하여 `docker compose`를 통해 최신 이미지를 반영합니다.
 
 ### 배포 구성
@@ -97,3 +104,8 @@ graph TD
 
 ### 빌드 타겟 플랫폼
 GitHub Actions의 백엔드 빌드 스텝은 `linux/arm64` 플랫폼을 타겟으로 합니다. 만약 x86_64(Intel/AMD) 기반 서버로 배포 환경이 변경될 경우, `deploy.yml`의 `platforms` 설정을 수정해야 합니다.
+
+## 7. 성능 비교 리포트
+
+- FUR-19 변경 전/후(경로 분기+캐시 보강) 최근 5회 실행 비교표:
+  - `docs/CICD_SPEED_ANALYSIS_FUR-19.md`

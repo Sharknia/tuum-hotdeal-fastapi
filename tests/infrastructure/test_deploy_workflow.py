@@ -96,3 +96,55 @@ def test_predeploy_migration_runs_before_recreate():
     strict_mode_index = workflow_text.index("set -euo pipefail")
 
     assert strict_mode_index < migration_index < recreate_index
+
+
+def test_backend_ci_and_backend_deploy_filters_are_split():
+    workflow_text = (PROJECT_ROOT / ".github/workflows/deploy.yml").read_text(
+        encoding="utf-8"
+    )
+    backend_ci_match = re.search(
+        r"(?ms)^ {12}backend_ci:\n(?P<section>(?: {14}- .*\n)+)", workflow_text
+    )
+    backend_deploy_match = re.search(
+        r"(?ms)^ {12}backend_deploy:\n(?P<section>(?: {14}- .*\n)+)", workflow_text
+    )
+
+    assert backend_ci_match is not None
+    assert backend_deploy_match is not None
+
+    backend_ci_section = backend_ci_match.group("section")
+    backend_deploy_section = backend_deploy_match.group("section")
+
+    assert "backend_ci:" in workflow_text
+    assert "backend_deploy:" in workflow_text
+    assert workflow_text.count("- 'tests/**'") == 1
+    assert workflow_text.count("- 'pytest.ini'") == 1
+    assert workflow_text.count("- '.env.test'") == 1
+    assert workflow_text.count("- 'Makefile'") == 1
+    assert workflow_text.count("- 'pyrightconfig.json'") == 1
+    assert "- 'Makefile'" in backend_ci_section
+    assert "- 'pyrightconfig.json'" in backend_ci_section
+    assert "- 'Makefile'" not in backend_deploy_section
+    assert "- 'pyrightconfig.json'" not in backend_deploy_section
+    assert "needs.changes.outputs.backend_ci == 'true'" in workflow_text
+    assert "needs.changes.outputs.backend_deploy == 'true'" in workflow_text
+    assert "needs: [changes, lint, test]" in workflow_text
+
+
+def test_build_cache_uses_gha_and_registry_sources():
+    workflow_text = (PROJECT_ROOT / ".github/workflows/deploy.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "cache-from: |" in workflow_text
+    assert "type=gha,scope=backend-arm64" in workflow_text
+    assert (
+        "type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-arm64"
+        in workflow_text
+    )
+    assert "cache-to: |" in workflow_text
+    assert "type=gha,scope=backend-arm64,mode=max" in workflow_text
+    assert (
+        "type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-arm64,"
+        "mode=max,image-manifest=true,oci-mediatypes=true"
+    ) in workflow_text

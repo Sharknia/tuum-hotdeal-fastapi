@@ -21,7 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       frontend: ${{ steps.filter.outputs.frontend || steps.force.outputs.frontend }}
-      backend: ${{ steps.filter.outputs.backend || steps.force.outputs.backend }}
+      backend_ci: ${{ steps.filter.outputs.backend_ci || steps.force.outputs.backend_ci }}
+      backend_deploy: ${{ steps.filter.outputs.backend_deploy || steps.force.outputs.backend_deploy }}
     steps:
       - uses: actions/checkout@v4
 
@@ -33,10 +34,11 @@ jobs:
           filters: |
             frontend:
               - 'static/**'
-            backend:
+            backend_ci:
               - 'app/**'
               - 'alembic/**'
               - 'tests/**'
+              - '.env.test'
               - 'pyproject.toml'
               - 'poetry.lock'
               - 'Dockerfile'
@@ -46,18 +48,28 @@ jobs:
               - 'alembic.ini'
               - 'pyrightconfig.json'
               - 'pytest.ini'
+            backend_deploy:
+              - 'app/**'
+              - 'alembic/**'
+              - 'pyproject.toml'
+              - 'poetry.lock'
+              - 'Dockerfile'
+              - 'docker-compose*.yml'
+              - 'entrypoint.sh'
+              - 'alembic.ini'
 
       - name: Force backend deploy
         id: force
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.force_deploy == true }}
         run: |
           echo "frontend=false" >> "$GITHUB_OUTPUT"
-          echo "backend=true" >> "$GITHUB_OUTPUT"
+          echo "backend_ci=true" >> "$GITHUB_OUTPUT"
+          echo "backend_deploy=true" >> "$GITHUB_OUTPUT"
 
   lint:
     name: Lint
     needs: changes
-    if: ${{ needs.changes.outputs.backend == 'true' && needs.changes.outputs.frontend != 'true' }}
+    if: ${{ needs.changes.outputs.backend_ci == 'true' && needs.changes.outputs.frontend != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -80,7 +92,7 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     needs: changes
-    if: ${{ needs.changes.outputs.backend == 'true' && needs.changes.outputs.frontend != 'true' }}
+    if: ${{ needs.changes.outputs.backend_ci == 'true' && needs.changes.outputs.frontend != 'true' }}
     env:
       DATABASE_URL: "sqlite+aiosqlite:///:memory:"
       REFRESH_TOKEN_SECRET_KEY: test-refresh-secret-key
@@ -106,7 +118,8 @@ jobs:
 
   build:
     name: Build & Push
-    needs: [lint, test]
+    needs: [changes, lint, test]
+    if: ${{ needs.changes.outputs.backend_deploy == 'true' && needs.changes.outputs.frontend != 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -146,8 +159,12 @@ jobs:
           platforms: linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha,scope=backend-arm64
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-arm64
+          cache-to: |
+            type=gha,scope=backend-arm64,mode=max
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-arm64,mode=max,image-manifest=true,oci-mediatypes=true
 
   deploy:
     name: Deploy
