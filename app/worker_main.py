@@ -114,6 +114,56 @@ def _resolve_crawl_concurrency(active_sites: list[SiteName]) -> tuple[int, int]:
     return site_limit, keyword_limit
 
 
+def _resolve_protection_keyword_ratio() -> float:
+    try:
+        ratio = float(settings.CRAWL_PROTECTION_KEYWORD_RATIO)
+    except (TypeError, ValueError):
+        ratio = 0.5
+    return max(0.1, min(ratio, 1.0))
+
+
+def _prioritize_keywords_for_protection(keywords: list[Keyword]) -> list[Keyword]:
+    return sorted(
+        keywords,
+        key=lambda keyword: (-len(keyword.users or []), keyword.title),
+    )
+
+
+def _apply_proxy_pool_protection(
+    keywords: list[Keyword],
+    site_limit: int,
+    keyword_limit: int,
+) -> tuple[list[Keyword], int, int]:
+    protected_site_limit = _clamp_concurrency(
+        "CRAWL_PROTECTION_SITE_CONCURRENCY",
+        settings.CRAWL_PROTECTION_SITE_CONCURRENCY,
+        site_limit,
+    )
+    protected_keyword_limit = _clamp_concurrency(
+        "CRAWL_PROTECTION_KEYWORD_CONCURRENCY",
+        settings.CRAWL_PROTECTION_KEYWORD_CONCURRENCY,
+        keyword_limit,
+    )
+    if protected_keyword_limit < protected_site_limit:
+        protected_keyword_limit = protected_site_limit
+
+    protection_ratio = _resolve_protection_keyword_ratio()
+    max_keywords = max(1, int(len(keywords) * protection_ratio))
+    prioritized_keywords = _prioritize_keywords_for_protection(keywords)
+    selected_keywords = prioritized_keywords[:max_keywords]
+
+    logger.warning(
+        "[WARN] 프록시 보호 모드 활성화: site_limit=%s->%s, keyword_limit=%s->%s, keywords=%s->%s",
+        site_limit,
+        protected_site_limit,
+        keyword_limit,
+        protected_keyword_limit,
+        len(keywords),
+        len(selected_keywords),
+    )
+    return selected_keywords, protected_site_limit, protected_keyword_limit
+
+
 def _resolve_timeout_seconds(
     name: str,
     configured: float,
@@ -459,7 +509,9 @@ async def _run_job_once():
         try:
             async with AsyncSessionLocal() as session:
                 # 사용자와 매핑된 키워드만 조회
-                stmt = select(Keyword).where(Keyword.users.any())
+                stmt = select(Keyword).options(selectinload(Keyword.users)).where(
+                    Keyword.users.any()
+                )
                 result = await session.execute(stmt)
                 keywords_to_process = result.scalars().unique().all()
 
@@ -475,12 +527,21 @@ async def _run_job_once():
             logger.debug("[DEBUG] 처리할 활성 키워드가 없습니다.")
             return
 
-        PROXY_MANAGER.reset_proxies()
-        PROXY_MANAGER.fetch_proxies()
+        PROXY_MANAGER.start_batch()
+        proxy_pool_ready = PROXY_MANAGER.ensure_min_available_proxies(
+            settings.MIN_AVAILABLE_PROXIES
+        )
+        PROXY_MANAGER.log_metrics("batch_start")
 
         id_to_crawled_keyword: dict[Keyword, list[CrawledKeyword]] = {}
 
         site_limit, keyword_limit = _resolve_crawl_concurrency(active_sites)
+        if not proxy_pool_ready:
+            keywords_to_process, site_limit, keyword_limit = _apply_proxy_pool_protection(
+                keywords_to_process,
+                site_limit,
+                keyword_limit,
+            )
 
         # 사이트별 동시성 제한 세마포어
         site_semaphores = {
@@ -504,15 +565,33 @@ async def _run_job_once():
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # 결과 처리
+        failed_keyword_count = 0
         for i, res in enumerate(results):
             if isinstance(res, Exception):
                 # 실패한 경우, 어떤 키워드에서 오류가 났는지 로깅
                 failed_keyword = keywords_to_process[i]
                 logger.error(f"키워드 '[{failed_keyword.title}]' 처리 중 오류 발생: {res}")
+                failed_keyword_count += 1
             elif res:
                 keyword, deals = res
                 total_items_found += len(deals)
                 id_to_crawled_keyword[keyword] = deals
+
+        total_keyword_count = len(keywords_to_process)
+        batch_failure_rate = (
+            failed_keyword_count / total_keyword_count if total_keyword_count else 0.0
+        )
+        logger.info(
+            "[METRIC] batch_failure_rate=%.3f failed_keywords=%s total_keywords=%s",
+            batch_failure_rate,
+            failed_keyword_count,
+            total_keyword_count,
+        )
+        logger.info(
+            "[METRIC] proxy_failure_rates=%s",
+            PROXY_MANAGER.get_failure_rates(batch_only=True),
+        )
+        PROXY_MANAGER.log_metrics("batch_end")
 
         logger.debug("[DEBUG] 모든 키워드 크롤링 완료. 메일 발송 시작...")
 
