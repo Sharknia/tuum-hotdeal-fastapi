@@ -102,12 +102,30 @@ def test_backend_ci_and_backend_deploy_filters_are_split():
     workflow_text = (PROJECT_ROOT / ".github/workflows/deploy.yml").read_text(
         encoding="utf-8"
     )
+    backend_ci_match = re.search(
+        r"(?ms)^ {12}backend_ci:\n(?P<section>(?: {14}- .*\n)+)", workflow_text
+    )
+    backend_deploy_match = re.search(
+        r"(?ms)^ {12}backend_deploy:\n(?P<section>(?: {14}- .*\n)+)", workflow_text
+    )
+
+    assert backend_ci_match is not None
+    assert backend_deploy_match is not None
+
+    backend_ci_section = backend_ci_match.group("section")
+    backend_deploy_section = backend_deploy_match.group("section")
 
     assert "backend_ci:" in workflow_text
     assert "backend_deploy:" in workflow_text
     assert workflow_text.count("- 'tests/**'") == 1
     assert workflow_text.count("- 'pytest.ini'") == 1
     assert workflow_text.count("- '.env.test'") == 1
+    assert workflow_text.count("- 'Makefile'") == 1
+    assert workflow_text.count("- 'pyrightconfig.json'") == 1
+    assert "- 'Makefile'" in backend_ci_section
+    assert "- 'pyrightconfig.json'" in backend_ci_section
+    assert "- 'Makefile'" not in backend_deploy_section
+    assert "- 'pyrightconfig.json'" not in backend_deploy_section
     assert "needs.changes.outputs.backend_ci == 'true'" in workflow_text
     assert "needs.changes.outputs.backend_deploy == 'true'" in workflow_text
     assert "needs: [changes, lint, test]" in workflow_text

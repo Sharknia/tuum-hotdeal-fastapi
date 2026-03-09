@@ -56,9 +56,7 @@ jobs:
               - 'Dockerfile'
               - 'docker-compose*.yml'
               - 'entrypoint.sh'
-              - 'Makefile'
               - 'alembic.ini'
-              - 'pyrightconfig.json'
 
       - name: Force backend deploy
         id: force

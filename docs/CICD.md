@@ -15,7 +15,7 @@
 - **우선순위**: `Frontend 변경` → `Backend Deploy 변경` → `Backend CI 전용 변경` → `Non Deploy`
 - **Frontend 변경**: `static/**`
 - **Backend CI 변경 (`backend_ci`)**: `app/**`, `alembic/**`, `tests/**`, `.env.test`, `pyproject.toml`, `poetry.lock`, `Dockerfile`, `docker-compose*.yml`, `entrypoint.sh`, `Makefile`, `alembic.ini`, `pyrightconfig.json`, `pytest.ini`
-- **Backend Deploy 변경 (`backend_deploy`)**: `app/**`, `alembic/**`, `pyproject.toml`, `poetry.lock`, `Dockerfile`, `docker-compose*.yml`, `entrypoint.sh`, `Makefile`, `alembic.ini`, `pyrightconfig.json`
+- **Backend Deploy 변경 (`backend_deploy`)**: `app/**`, `alembic/**`, `pyproject.toml`, `poetry.lock`, `Dockerfile`, `docker-compose*.yml`, `entrypoint.sh`, `alembic.ini`
 - **Non Deploy**: 위 경로에 해당하지 않는 모든 변경(예: `.agent/**`, `.opencode/**`, `docs/**`, `README.md`, `.gitignore`, `.github/**`)
 - **잡 분기**:
   - `Lint/Test`: `backend_ci` 기준
