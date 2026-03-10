@@ -38,6 +38,8 @@ async def test_send_approval_notification_calls_send_email():
         assert call_args.kwargs["to"] == "test@example.com"
         assert "testuser" in call_args.kwargs["body"]
         assert "가입이 승인되었습니다" in call_args.kwargs["body"]
+        assert "https://hotdeal.tuum.day/login" in call_args.kwargs["body"]
+        assert "https://hotdeal.tuum.day/hotdeal" in call_args.kwargs["body"]
 
 
 @pytest.mark.asyncio
