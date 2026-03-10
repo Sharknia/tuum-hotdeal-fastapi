@@ -28,7 +28,7 @@ from app.src.Infrastructure.crawling.crawlers import (
     get_active_sites,
     get_crawler,
 )
-from app.src.Infrastructure.crawling.proxy_manager import ProxyManager
+from app.src.Infrastructure.crawling.proxy_manager import ProxyFailureType, ProxyManager
 from app.src.Infrastructure.crawling.shared_browser import SharedBrowser
 from app.src.Infrastructure.mail.mail_manager import (
     make_hotdeal_email_content,
@@ -64,6 +64,10 @@ AsyncSessionLocal = async_sessionmaker(
 
 PROXY_MANAGER = ProxyManager()
 JOB_RUN_LOCK = asyncio.Lock()
+ALGUMON_PROXY_RECOVERY_FAILURE_TYPES = frozenset(
+    {ProxyFailureType.BLOCKED, ProxyFailureType.UNKNOWN}
+)
+ALGUMON_PROXY_HISTORY_RECONCILED = False
 
 UNKNOWN_TEXT = "unknown"
 UNKNOWN_COUNT = -1
@@ -162,6 +166,22 @@ def _apply_proxy_pool_protection(
         len(selected_keywords),
     )
     return selected_keywords, protected_site_limit, protected_keyword_limit
+
+
+def _reconcile_algumon_proxy_history(active_sites: list[SiteName]) -> None:
+    global ALGUMON_PROXY_HISTORY_RECONCILED
+
+    if ALGUMON_PROXY_HISTORY_RECONCILED:
+        return
+    if SiteName.ALGUMON not in active_sites:
+        return
+
+    summary = PROXY_MANAGER.rehabilitate_proxy_history(
+        failure_types=set(ALGUMON_PROXY_RECOVERY_FAILURE_TYPES),
+        reason="algumon_search_endpoint_migration",
+    )
+    ALGUMON_PROXY_HISTORY_RECONCILED = True
+    logger.info("[METRIC] algumon_proxy_history_reconciliation=%s", summary)
 
 
 def _resolve_timeout_seconds(
@@ -364,6 +384,13 @@ async def get_new_hotdeal_keywords_for_site(
     # 1. 크롤링으로 최신 핫딜 목록 가져오기
     crawler = get_crawler(site, keyword.title, client)
     latest_products: list[CrawledKeyword] = await crawler.fetchparse()
+    logger.info(
+        "[METRIC] crawl_site_result site=%s keyword=%s results=%s search_url=%s",
+        site.value,
+        keyword.title,
+        len(latest_products),
+        crawler.search_url,
+    )
 
     if not latest_products:
         return []
@@ -527,6 +554,7 @@ async def _run_job_once():
             logger.debug("[DEBUG] 처리할 활성 키워드가 없습니다.")
             return
 
+        _reconcile_algumon_proxy_history(active_sites)
         PROXY_MANAGER.start_batch()
         proxy_pool_ready = PROXY_MANAGER.ensure_min_available_proxies(
             settings.MIN_AVAILABLE_PROXIES

@@ -13,6 +13,7 @@ from app.src.domain.hotdeal.models import Keyword, KeywordSite
 from app.src.domain.hotdeal.schemas import CrawledKeyword
 from app.worker_main import (
     _apply_proxy_pool_protection,
+    _reconcile_algumon_proxy_history,
     _resolve_crawl_concurrency,
     _resolve_timeout_seconds,
     get_new_hotdeal_keywords,
@@ -31,7 +32,7 @@ CRAWLED_DATA_NEW = [
         link="new_link1",
         price="10000원",
         site_name=SiteName.ALGUMON,
-        search_url="https://www.algumon.com/search/테스트키워드",
+        search_url="https://www.algumon.com/n/deal?keyword=%ED%85%8C%EC%8A%A4%ED%8A%B8%ED%82%A4%EC%9B%8C%EB%93%9C",
     ),
     CrawledKeyword(
         id="102",
@@ -39,7 +40,7 @@ CRAWLED_DATA_NEW = [
         link="new_link2",
         price="20000원",
         site_name=SiteName.ALGUMON,
-        search_url="https://www.algumon.com/search/테스트키워드",
+        search_url="https://www.algumon.com/n/deal?keyword=%ED%85%8C%EC%8A%A4%ED%8A%B8%ED%82%A4%EC%9B%8C%EB%93%9C",
     ),
     CrawledKeyword(
         id="103",
@@ -47,7 +48,7 @@ CRAWLED_DATA_NEW = [
         link="old_link3",
         price="30000원",
         site_name=SiteName.ALGUMON,
-        search_url="https://www.algumon.com/search/테스트키워드",
+        search_url="https://www.algumon.com/n/deal?keyword=%ED%85%8C%EC%8A%A4%ED%8A%B8%ED%82%A4%EC%9B%8C%EB%93%9C",
     ),
 ]
 
@@ -58,7 +59,7 @@ CRAWLED_DATA_NO_NEW = [
         link="old_link3",
         price="30000원",
         site_name=SiteName.ALGUMON,
-        search_url="https://www.algumon.com/search/테스트키워드",
+        search_url="https://www.algumon.com/n/deal?keyword=%ED%85%8C%EC%8A%A4%ED%8A%B8%ED%82%A4%EC%9B%8C%EB%93%9C",
     ),
     CrawledKeyword(
         id="104",
@@ -66,7 +67,7 @@ CRAWLED_DATA_NO_NEW = [
         link="old_link4",
         price="40000원",
         site_name=SiteName.ALGUMON,
-        search_url="https://www.algumon.com/search/테스트키워드",
+        search_url="https://www.algumon.com/n/deal?keyword=%ED%85%8C%EC%8A%A4%ED%8A%B8%ED%82%A4%EC%9B%8C%EB%93%9C",
     ),
 ]
 
@@ -153,6 +154,45 @@ def test_apply_proxy_pool_protection_reduces_limits_and_prioritizes_keywords():
     assert protected_site_limit == 1
     assert protected_keyword_limit == 2
     assert [keyword.title for keyword in selected] == ["alpha", "gamma"]
+
+
+def test_reconcile_algumon_proxy_history_runs_once_for_algumon():
+    with (
+        patch("app.worker_main.ALGUMON_PROXY_HISTORY_RECONCILED", False),
+        patch.object(
+            worker_main_module.PROXY_MANAGER,
+            "rehabilitate_proxy_history",
+            return_value={
+                "reset": 1,
+                "released_soft_bans": 1,
+                "released_hard_bans": 0,
+                "requeued": 1,
+            },
+        ) as mock_rehabilitate,
+    ):
+        _reconcile_algumon_proxy_history([SiteName.ALGUMON])
+        _reconcile_algumon_proxy_history([SiteName.ALGUMON])
+
+    mock_rehabilitate.assert_called_once_with(
+        failure_types={
+            worker_main_module.ProxyFailureType.BLOCKED,
+            worker_main_module.ProxyFailureType.UNKNOWN,
+        },
+        reason="algumon_search_endpoint_migration",
+    )
+
+
+def test_reconcile_algumon_proxy_history_skips_when_algumon_is_inactive():
+    with (
+        patch("app.worker_main.ALGUMON_PROXY_HISTORY_RECONCILED", False),
+        patch.object(
+            worker_main_module.PROXY_MANAGER,
+            "rehabilitate_proxy_history",
+        ) as mock_rehabilitate,
+    ):
+        _reconcile_algumon_proxy_history([])
+
+    mock_rehabilitate.assert_not_called()
 
 
 @pytest.mark.parametrize(

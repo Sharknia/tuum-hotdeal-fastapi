@@ -67,7 +67,7 @@ class TestGetSiteInfoList:
         # then
         assert algumon is not None
         assert algumon.display_name == "알구몬"
-        assert "algumon.com" in algumon.search_url_template
+        assert algumon.search_url_template == "https://www.algumon.com/n/deal?keyword={keyword}"
 
     def test_ruliweb_not_in_site_info_list(self):
         """Ruliweb 크롤러가 제거되었으므로 site_info_list에 포함되지 않아야 함"""

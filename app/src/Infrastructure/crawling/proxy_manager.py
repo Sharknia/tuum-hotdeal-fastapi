@@ -410,6 +410,54 @@ class ProxyManager:
         )
         return state
 
+    def rehabilitate_proxy_history(
+        self,
+        *,
+        failure_types: set[ProxyFailureType],
+        reason: str,
+    ) -> dict[str, int]:
+        summary = {
+            "reset": 0,
+            "released_soft_bans": 0,
+            "released_hard_bans": 0,
+            "requeued": 0,
+        }
+        if not failure_types:
+            return summary
+
+        for proxy_url, state in self._proxy_states.items():
+            if state.last_failure_type not in failure_types:
+                continue
+            if (
+                state.failure_count == 0
+                and state.soft_ban_until is None
+                and not state.is_hard_banned
+            ):
+                continue
+
+            if state.soft_ban_until is not None:
+                summary["released_soft_bans"] += 1
+            if state.is_hard_banned:
+                summary["released_hard_bans"] += 1
+
+            state.failure_count = 0
+            state.last_failure_type = None
+            state.last_failed_at = None
+            state.soft_ban_until = None
+            state.is_hard_banned = False
+            summary["reset"] += 1
+
+            if self.register_proxy(proxy_url):
+                summary["requeued"] += 1
+
+        logger.info(
+            "프록시 이력 재정비: reason=%s, failure_types=%s, summary=%s",
+            reason,
+            sorted(failure_type.value for failure_type in failure_types),
+            summary,
+        )
+        return summary
+
     def remove_proxy(
         self,
         proxy_url: str,
