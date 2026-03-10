@@ -12,7 +12,7 @@ CRAWLER_REGISTRY: dict[SiteName, type[BaseCrawler]] = {
 SITE_METADATA: dict[SiteName, dict[str, str]] = {
     SiteName.ALGUMON: {
         "display_name": "알구몬",
-        "search_url_template": "https://www.algumon.com/search/{keyword}",
+        "search_url_template": "https://www.algumon.com/n/deal?keyword={keyword}",
     },
 }
 

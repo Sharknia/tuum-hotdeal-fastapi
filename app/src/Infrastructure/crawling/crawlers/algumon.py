@@ -1,4 +1,6 @@
-from bs4 import BeautifulSoup
+from urllib.parse import urlencode
+
+from bs4 import BeautifulSoup, Tag
 
 from app.src.core.logger import logger
 from app.src.domain.hotdeal.enums import SiteName
@@ -7,9 +9,21 @@ from app.src.Infrastructure.crawling.base_crawler import BaseCrawler
 
 
 class AlgumonCrawler(BaseCrawler):
+    SEARCH_URL_BASE = "https://www.algumon.com/n/deal"
+    DEAL_URL_TEMPLATE = "https://www.algumon.com/n/deal/{post_id}"
+    DEAL_CARD_ID_PREFIX = "deal-"
+    TITLE_SELECTOR = "h3 a[href]"
+    PRICE_CLASS = "deal-price-text"
+    SOURCE_META_CLASSES = frozenset({"flex", "items-center", "gap-1", "mb-1.5"})
+    PRICE_META_CLASSES = frozenset(
+        {"flex", "items-center", "gap-1", "text-xs", "mb-1", "mt-1"}
+    )
+    STATS_META_CLASSES = frozenset({"flex", "gap-2", "text-xs", "mb-0.5"})
+
     @property
     def url(self) -> str:
-        return f"https://www.algumon.com/search/{self.keyword}"
+        query = urlencode({"keyword": self.keyword})
+        return f"{self.SEARCH_URL_BASE}?{query}"
 
     @property
     def site_name(self) -> SiteName:
@@ -17,32 +31,66 @@ class AlgumonCrawler(BaseCrawler):
 
     def parse(self, html: str) -> list[CrawledKeyword]:
         soup = BeautifulSoup(html, "html.parser")
-        product_list = soup.find("ul", class_="product post-list")
-        if not product_list:
-            logger.warning("알구몬 상품 리스트를 찾을 수 없습니다.")
+        deal_cards = soup.find_all(
+            "div",
+            id=lambda value: value and value.startswith(self.DEAL_CARD_ID_PREFIX),
+        )
+        if not deal_cards:
+            logger.warning("알구몬 딜 카드를 찾을 수 없습니다.")
             return []
 
-        products = []
-        for li in product_list.find_all("li"):
-            post_id = li.get("data-post-id")
-            action_uri = li.get("data-action-uri")
-            product_link = li.find("a", class_="product-link")
-            product_price = li.find("small", class_="product-price")
-            meta_info = li.find("small", class_="deal-price-meta-info")
+        products: list[CrawledKeyword] = []
+        for card in deal_cards:
+            post_id = card.get("id", "").removeprefix(self.DEAL_CARD_ID_PREFIX).strip()
+            title_anchor = card.select_one(self.TITLE_SELECTOR)
+            if not post_id or title_anchor is None:
+                continue
 
-            if post_id and action_uri and product_link:
-                products.append(
-                    CrawledKeyword(
-                        id=post_id,
-                        title=product_link.text.strip(),
-                        link=f"https://www.algumon.com{action_uri.strip()}",
-                        price=(product_price.text.strip() if product_price else None),
-                        meta_data=(meta_info.text.strip() if meta_info else "")
-                        .replace("\n", "")
-                        .replace("\r", "")
-                        .replace(" ", ""),
-                        site_name=self.site_name,
-                        search_url=self.search_url,
-                    )
+            title = self._normalize_text(title_anchor)
+            if not title:
+                continue
+
+            meta_segments = [
+                self._normalize_text(
+                    self._find_card_block(card, "div", self.SOURCE_META_CLASSES)
+                ),
+                self._normalize_text(
+                    self._find_card_block(card, "div", self.PRICE_META_CLASSES)
+                ),
+                self._normalize_text(
+                    self._find_card_block(card, "div", self.STATS_META_CLASSES)
+                ),
+            ]
+
+            products.append(
+                CrawledKeyword(
+                    id=post_id,
+                    title=title,
+                    link=self.DEAL_URL_TEMPLATE.format(post_id=post_id),
+                    price=self._normalize_text(card.find("p", class_=self.PRICE_CLASS)),
+                    meta_data=" | ".join(segment for segment in meta_segments if segment)
+                    or None,
+                    site_name=self.site_name,
+                    search_url=self.search_url,
                 )
+            )
         return products
+
+    @staticmethod
+    def _normalize_text(node: Tag | None) -> str | None:
+        if node is None:
+            return None
+        text = " ".join(" ".join(node.stripped_strings).split())
+        return text or None
+
+    @staticmethod
+    def _find_card_block(
+        card: Tag,
+        name: str,
+        required_classes: frozenset[str],
+    ) -> Tag | None:
+        for node in card.find_all(name):
+            classes = set(node.get("class") or [])
+            if required_classes.issubset(classes):
+                return node
+        return None

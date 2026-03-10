@@ -239,3 +239,48 @@ def test_get_metrics_does_not_mutate_soft_ban_state(proxy_manager):
     next_proxy = proxy_manager.get_next_proxy()
     assert next_proxy == proxy_url
     assert state.soft_ban_until is None
+
+
+def test_rehabilitate_proxy_history_restores_only_targeted_failures(proxy_manager):
+    blocked_proxy = "http://1.1.1.1:8080"
+    unknown_proxy = "http://1.1.1.2:8080"
+    network_proxy = "http://1.1.1.3:8080"
+    for proxy_url in (blocked_proxy, unknown_proxy, network_proxy):
+        proxy_manager.register_proxy(proxy_url)
+
+    with (
+        patch.object(settings, "PROXY_SOFT_BAN_FAILURE_THRESHOLD", 1),
+        patch.object(settings, "PROXY_HARD_BAN_FAILURE_THRESHOLD", 2),
+        patch.object(settings, "PROXY_SOFT_BAN_TTL_SECONDS", 60),
+    ):
+        blocked_state = proxy_manager.record_proxy_failure(
+            blocked_proxy, ProxyFailureType.BLOCKED
+        )
+        unknown_state = proxy_manager.record_proxy_failure(
+            unknown_proxy, ProxyFailureType.UNKNOWN
+        )
+        proxy_manager.record_proxy_failure(network_proxy, ProxyFailureType.NETWORK)
+        proxy_manager.record_proxy_failure(network_proxy, ProxyFailureType.NETWORK)
+
+    summary = proxy_manager.rehabilitate_proxy_history(
+        failure_types={ProxyFailureType.BLOCKED, ProxyFailureType.UNKNOWN},
+        reason="algumon_search_endpoint_migration",
+    )
+
+    assert summary == {
+        "reset": 2,
+        "released_soft_bans": 2,
+        "released_hard_bans": 0,
+        "requeued": 0,
+    }
+    assert blocked_state.failure_count == 0
+    assert blocked_state.soft_ban_until is None
+    assert blocked_state.is_hard_banned is False
+    assert unknown_state.failure_count == 0
+    assert unknown_state.soft_ban_until is None
+    assert unknown_state.is_hard_banned is False
+
+    preserved_state = proxy_manager.get_proxy_state(network_proxy)
+    assert preserved_state is not None
+    assert preserved_state.failure_count == 2
+    assert preserved_state.is_hard_banned is True
