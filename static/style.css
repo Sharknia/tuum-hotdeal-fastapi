@@ -393,6 +393,85 @@ button:hover {
     font-size: var(--font-size-base);
 }
 
+.auth-feedback {
+    margin-top: calc(var(--spacing-sm) * -1);
+    margin-bottom: var(--spacing-xl);
+    padding: var(--spacing-md);
+    border-radius: var(--border-radius-sm);
+    font-size: calc(var(--font-size-base) - 1px);
+    line-height: 1.5;
+    text-align: left;
+}
+
+.auth-feedback-error {
+    border: 1px solid #f3c9c9;
+    background-color: #fff4f4;
+    color: #b42318;
+}
+
+.auth-guidance {
+    margin-top: calc(var(--spacing-sm) * -1);
+    margin-bottom: var(--spacing-xl);
+    font-size: calc(var(--font-size-base) - 1px);
+    color: var(--text-muted-color);
+}
+
+.auth-status-card {
+    margin-bottom: var(--spacing-xl);
+    padding: var(--spacing-xl);
+    border: 1px solid #d7ebdb;
+    border-radius: var(--border-radius-sm);
+    background-color: #f5fbf6;
+    text-align: left;
+}
+
+.auth-status-card h2 {
+    margin: 0 0 var(--spacing-md) 0;
+    font-size: calc(var(--font-size-h1) - 6px);
+    color: #1f5d2b;
+}
+
+.auth-status-card p {
+    margin-bottom: var(--spacing-md);
+    color: #245c31;
+}
+
+.auth-status-list {
+    margin: 0 0 var(--spacing-lg) 0;
+    padding-left: var(--spacing-xl);
+    color: #245c31;
+}
+
+.auth-status-list li {
+    margin-bottom: var(--spacing-sm);
+    font-size: calc(var(--font-size-base) - 1px);
+}
+
+.auth-secondary-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-sm) var(--spacing-lg);
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--primary-color);
+    color: var(--primary-color);
+    background-color: white;
+    text-decoration: none;
+    font-weight: 500;
+    transition:
+        color var(--transition-fast),
+        background-color var(--transition-fast);
+}
+
+.auth-secondary-button:hover {
+    color: white;
+    background-color: var(--primary-color);
+}
+
+.is-hidden {
+    display: none !important;
+}
+
 .auth-box .input-group {
     margin-bottom: var(--spacing-xl);
     text-align: left;

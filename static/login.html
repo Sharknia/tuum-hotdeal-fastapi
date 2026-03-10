@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>로그인 - tuum.day</title>
         <script src="./js/auth.js?v=1.0.0"></script>
-        <script src="./login.js?v=1.0.0"></script>
+        <script src="./login.js?v=1.0.1"></script>
         <script>
             async function init() {
                 const tokens = await getTokens();
@@ -14,7 +14,7 @@
                 }
             }
 
-            await init();
+            init();
         </script>
         <link rel="stylesheet" href="./style.css" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -28,7 +28,8 @@
         <div class="auth-container">
             <div class="auth-box">
                 <h1>tuum.day</h1>
-                <p>로그인하여 서비스를 이용하세요.</p>
+                <p>승인된 계정으로 로그인 후 핫딜 페이지를 이용할 수 있습니다.</p>
+                <p id="login-feedback" class="auth-feedback auth-feedback-error" hidden aria-live="polite"></p>
                 <form id="login-form">
                     <div class="input-group">
                         <label for="email">이메일</label>
@@ -44,6 +45,7 @@
                     </div>
                     <button type="submit" class="auth-button">로그인</button>
                 </form>
+                <p class="auth-guidance">가입 직후에는 관리자 승인 완료 전까지 로그인할 수 없습니다.</p>
                 <div class="auth-link">계정이 없으신가요? <a href="/signup">회원가입</a></div>
             </div>
         </div>

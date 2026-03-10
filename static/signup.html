@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>회원가입 - tuum.day</title>
         <script src="./js/auth.js?v=1.0.0"></script>
-        <script src="./signup.js?v=1.0.0"></script>
+        <script src="./signup.js?v=1.0.1"></script>
         <script>
             async function init() {
                 const tokens = await getTokens();
@@ -28,7 +28,8 @@
         <div class="auth-container">
             <div class="auth-box">
                 <h1>tuum.day</h1>
-                <p>회원가입하여 서비스를 이용하세요.</p>
+                <p>회원가입 후 관리자 승인 완료 시 로그인할 수 있습니다.</p>
+                <p id="signup-feedback" class="auth-feedback auth-feedback-error" hidden aria-live="polite"></p>
                 <form id="signup-form">
                     <div class="input-group">
                         <label for="email">이메일</label>
@@ -48,6 +49,18 @@
                     </div>
                     <button type="submit" class="auth-button">회원가입</button>
                 </form>
+                <section id="signup-pending" class="auth-status-card" hidden>
+                    <h2>가입 신청이 접수되었습니다</h2>
+                    <p>
+                        <strong id="pending-nickname">회원</strong>님(<span id="pending-email"></span>)의 계정은
+                        현재 <strong>승인 대기</strong> 상태입니다.
+                    </p>
+                    <ul class="auth-status-list">
+                        <li>승인 완료 시 등록한 이메일로 안내 메일이 발송됩니다.</li>
+                        <li>메일의 로그인 링크로 접속해 로그인 후 핫딜 페이지를 이용해 주세요.</li>
+                    </ul>
+                    <a class="auth-secondary-button" href="/login">로그인 페이지로 이동</a>
+                </section>
                 <div class="auth-link">이미 계정이 있으신가요? <a href="/login">로그인</a></div>
             </div>
         </div>

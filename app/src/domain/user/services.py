@@ -192,7 +192,9 @@ async def send_approval_notification(email: str, nickname: str) -> None:
 귀하의 가입이 승인되었습니다.
 이제 서비스를 이용하실 수 있습니다.
 
-로그인: https://hotdeal.tuum.day/login"""
+다음 순서로 이용해 주세요.
+1. 로그인: https://hotdeal.tuum.day/login
+2. 로그인 후 핫딜 페이지 이동: https://hotdeal.tuum.day/hotdeal"""
 
     try:
         await send_email(subject=subject, to=email, body=body)
